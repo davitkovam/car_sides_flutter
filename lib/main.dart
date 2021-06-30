@@ -1,13 +1,24 @@
 import 'dart:io';
-
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
+import 'package:sides/sides.dart';
 import 'package:flutter/material.dart';
 
-import 'package:image_picker/image_picker.dart';
-import 'package:sides/sides.dart';
+//Possible classes
+final List<String> sides = ['Front', 'Back', 'Left', 'Right', 'Diagonal'];
+String realSide = "";
+
+//All functions are in sides.dart -> packages/sides/lib/sides.dart
+
+
 
 
 void main() {
-  runApp(MyApp());
+  runApp(MultiProvider(
+    providers: [ChangeNotifierProvider<SingleNotifier>(create: (_) => SingleNotifier(),)
+    ],
+    child: MyApp(),));
 }
 
 class MyApp extends StatelessWidget {
@@ -51,6 +62,72 @@ class MyHomePage extends StatefulWidget {
   _MyHomePageState createState() => _MyHomePageState();
 }
 
+class SingleNotifier extends ChangeNotifier {
+  var _currentSide = sides[0];
+  SingleNotifier();
+  String get currentSide => _currentSide;
+  updateSide(var value) {
+    if (value != _currentSide) {
+      _currentSide = value;
+      notifyListeners();
+    }
+  }
+}
+
+//Dialogue to ask for the real side
+_showSingleChoiceDialog(BuildContext context, SingleNotifier _singleNotifier) => showDialog(
+    context: context,
+    builder: (context) {
+      _singleNotifier = new SingleNotifier();
+     _singleNotifier = Provider.of<SingleNotifier>(context);
+     realSide = _singleNotifier.currentSide;
+      return AlertDialog(
+          title: Text("Select the real side!"),
+          content: SingleChildScrollView(
+            child: Container(
+              width: double.infinity,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: sides
+                    .map((e) => RadioListTile(
+                  title: Text(e),
+                  value: e,
+                  groupValue: _singleNotifier.currentSide,
+                  selected: _singleNotifier.currentSide == e,
+                  onChanged: (value) {
+
+
+                    print("onchange: ");
+                    print(value);
+                    print(_singleNotifier.currentSide);
+
+
+                    if (value != _singleNotifier.currentSide) {
+                      print(value);
+                      _singleNotifier.updateSide(value);
+                      print(_singleNotifier.currentSide);
+                      //Navigator.of(context).pop();
+                    }
+                  },
+                ))
+                    .toList(),
+              ),
+            ),
+          ),
+        actions: <Widget>[
+          new FlatButton(
+            child: new Text("OK"),
+            onPressed: () {
+              //_singleNotifier.updateSide(realSide);
+              realSide = _singleNotifier.currentSide;
+              Navigator.of(context).pop();
+            },
+          )
+        ], );
+    });
+
+
+
 class _MyHomePageState extends State<MyHomePage> {
   File? _image = null;
   final picker = ImagePicker();
@@ -58,10 +135,18 @@ class _MyHomePageState extends State<MyHomePage> {
   var res="";
 
 
+//Take a picture
   Future getImage() async {
     final pickedFile = await picker.getImage(source: ImageSource.camera);
     _image = File(pickedFile!.path);
-    res = await predict(_image);
+    res = await predict(_image);                            //Predict using model
+    print(res);
+    SingleNotifier real = new SingleNotifier();
+    await _showSingleChoiceDialog(context, real);
+    print(realSide);                                      //Get real class from the dialogue
+    var uploaded = false;
+    uploaded = await uploadImage(_image, res, realSide); //TODO: Finish upload function in sides.dart
+    await save(_image, res, realSide); //Saves image with correct naming
     setState(() {
       if (pickedFile != null) {
         _image = File(pickedFile.path);
