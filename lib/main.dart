@@ -11,14 +11,15 @@ String realSide = "";
 
 //All functions are in sides.dart -> packages/sides/lib/sides.dart
 
-
-
-
 void main() {
   runApp(MultiProvider(
-    providers: [ChangeNotifierProvider<SingleNotifier>(create: (_) => SingleNotifier(),)
+    providers: [
+      ChangeNotifierProvider<SingleNotifier>(
+        create: (_) => SingleNotifier(),
+      )
     ],
-    child: MyApp(),));
+    child: MyApp(),
+  ));
 }
 
 class MyApp extends StatelessWidget {
@@ -64,8 +65,11 @@ class MyHomePage extends StatefulWidget {
 
 class SingleNotifier extends ChangeNotifier {
   var _currentSide = sides[0];
+
   SingleNotifier();
+
   String get currentSide => _currentSide;
+
   updateSide(var value) {
     if (value != _currentSide) {
       _currentSide = value;
@@ -75,78 +79,78 @@ class SingleNotifier extends ChangeNotifier {
 }
 
 //Dialogue to ask for the real side
-_showSingleChoiceDialog(BuildContext context, SingleNotifier _singleNotifier) => showDialog(
-    context: context,
-    builder: (context) {
-      _singleNotifier = new SingleNotifier();
-     _singleNotifier = Provider.of<SingleNotifier>(context);
-     realSide = _singleNotifier.currentSide;
-      return AlertDialog(
-          title: Text("Select the real side!"),
-          content: SingleChildScrollView(
-            child: Container(
-              width: double.infinity,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: sides
-                    .map((e) => RadioListTile(
-                  title: Text(e),
-                  value: e,
-                  groupValue: _singleNotifier.currentSide,
-                  selected: _singleNotifier.currentSide == e,
-                  onChanged: (value) {
-
-
-                    print("onchange: ");
-                    print(value);
-                    print(_singleNotifier.currentSide);
-
-
-                    if (value != _singleNotifier.currentSide) {
+_showSingleChoiceDialog(BuildContext context, SingleNotifier _singleNotifier) =>
+    showDialog(
+        context: context,
+        builder: (context) {
+          _singleNotifier = new SingleNotifier();
+          _singleNotifier = Provider.of<SingleNotifier>(context);
+          realSide = _singleNotifier.currentSide;
+          return AlertDialog(
+            title: Text("Select the real side!"),
+            content: SingleChildScrollView(
+              child: Container(
+                width: double.infinity,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: sides
+                      .map((e) => RadioListTile(
+                    title: Text(e),
+                    value: e,
+                    groupValue: _singleNotifier.currentSide,
+                    selected: _singleNotifier.currentSide == e,
+                    onChanged: (value) {
+                      print("onchange: ");
                       print(value);
-                      _singleNotifier.updateSide(value);
                       print(_singleNotifier.currentSide);
-                      //Navigator.of(context).pop();
-                    }
-                  },
-                ))
-                    .toList(),
+
+                      if (value != _singleNotifier.currentSide) {
+                        print(value);
+                        _singleNotifier.updateSide(value);
+                        print(_singleNotifier.currentSide);
+                        //Navigator.of(context).pop();
+                      }
+                    },
+                  ))
+                      .toList(),
+                ),
               ),
             ),
-          ),
-        actions: <Widget>[
-          new FlatButton(
-            child: new Text("OK"),
-            onPressed: () {
-              //_singleNotifier.updateSide(realSide);
-              realSide = _singleNotifier.currentSide;
-              Navigator.of(context).pop();
-            },
-          )
-        ], );
-    });
-
-
+            actions: <Widget>[
+              new FlatButton(
+                child: new Text("OK"),
+                onPressed: () {
+                  //_singleNotifier.updateSide(realSide);
+                  realSide = _singleNotifier.currentSide;
+                  Navigator.of(context).pop();
+                },
+              )
+            ],
+          );
+        });
 
 class _MyHomePageState extends State<MyHomePage> {
   File? _image = null;
   final picker = ImagePicker();
   var recognitions;
-  var res="";
-
+  var res = "";
 
 //Take a picture
   Future getImage() async {
-    final pickedFile = await picker.getImage(source: ImageSource.camera);
-    _image = File(pickedFile!.path);
-    res = await predict(_image);                            //Predict using model
-    print(res);
-    SingleNotifier real = new SingleNotifier();
-    await _showSingleChoiceDialog(context, real);
-    print(realSide);                                      //Get real class from the dialogue
-    var uploaded = false;
-    uploaded = await uploadImage(_image, res, realSide); //TODO: Finish upload function in sides.dart
-    await save(_image, res, realSide); //Saves image with correct naming
+    final pickedFile = await picker.getImage(
+        maxHeight: 500, maxWidth: 500, imageQuality: 1, source: ImageSource.camera);
+    if (pickedFile != null) {
+      _image = File(pickedFile.path);
+      res = await predict(_image); //Predict using model
+      print(res);
+      SingleNotifier real = new SingleNotifier();
+      await _showSingleChoiceDialog(context, real);
+      print(realSide); //Get real class from the dialogue
+      var uploaded = false;
+      uploaded = await uploadImage(
+          _image, res, realSide); //TODO: Finish upload function in sides.dart
+      await save(_image, res, realSide); //Saves image with correct naming
+    }
     setState(() {
       if (pickedFile != null) {
         _image = File(pickedFile.path);
@@ -163,19 +167,19 @@ class _MyHomePageState extends State<MyHomePage> {
         title: Text('Image Picker Example'),
       ),
       body: Center(
-        child:Column(mainAxisAlignment: MainAxisAlignment.spaceEvenly,children:[ _image == null
-            ? Text('No image selected.')
-            : Image.file(_image!),
-        _image==null ? Text("No available results") : Text(res)],
-      )),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _image == null ? Text('No image selected.') : Image.file(_image!),
+              _image == null ? Text("No available results") : Text(res)
+            ],
+          )),
       floatingActionButton: FloatingActionButton(
         onPressed: getImage,
         tooltip: 'Pick Image',
         child: Icon(Icons.add_a_photo),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.miniEndFloat,
-
     );
   }
-
 }
