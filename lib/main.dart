@@ -4,14 +4,20 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:sides/sides.dart';
 import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';
 
 //Possible classes
 final List<String> sides = ['Front', 'Back', 'Left', 'Right', 'Diagonal'];
 String realSide = "";
+var firstCamera;
 
 //All functions are in sides.dart -> packages/sides/lib/sides.dart
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final cameras = await availableCameras();
+  firstCamera = cameras.first;
+
   runApp(MultiProvider(
     providers: [
       ChangeNotifierProvider<SingleNotifier>(
@@ -40,13 +46,14 @@ class MyApp extends StatelessWidget {
         // is not restarted.
         primarySwatch: Colors.orange,
       ),
-      home: MyHomePage(title: 'Car Sides'),
+      home: MyHomePage(title: 'Car Sides', camera: firstCamera),
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
-  MyHomePage({Key? key, required this.title}) : super(key: key);
+  MyHomePage({Key? key, required this.title, required this.camera})
+      : super(key: key);
 
   // This widget is the home page of your application. It is stateful, meaning
   // that it has a State object (defined below) that contains fields that affect
@@ -56,7 +63,7 @@ class MyHomePage extends StatefulWidget {
   // case the title) provided by the parent (in this case the App widget) and
   // used by the build method of the State. Fields in a Widget subclass are
   // always marked "final".
-
+  final CameraDescription camera;
   final String title;
 
   @override
@@ -130,34 +137,56 @@ _showSingleChoiceDialog(BuildContext context, SingleNotifier _singleNotifier) =>
         });
 
 class _MyHomePageState extends State<MyHomePage> {
-  File? _image = null;
+  File? _image;
   final picker = ImagePicker();
   var recognitions;
   var res = "";
+  late CameraController _controller;
+  late Future<void> _initializeControllerFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    // To display the current output from the Camera,
+    // create a CameraController.
+    _controller = CameraController(
+      // Get a specific camera from the list of available cameras.
+      widget.camera,
+      // Define the resolution to use.
+      ResolutionPreset.medium,
+    );
+    _initializeControllerFuture = _controller.initialize();
+  }
+
+  @override
+  void dispose() {
+    // Dispose of the controller when the widget is disposed.
+    _controller.dispose();
+    super.dispose();
+  }
 
 //Take a picture
   Future getImage() async {
-    final pickedFile = await picker.getImage(
-        maxHeight: 500, maxWidth: 500, imageQuality: 1, source: ImageSource.camera);
-    if (pickedFile != null) {
-      _image = File(pickedFile.path);
-      res = await predict(_image); //Predict using model
-      print(res);
-      SingleNotifier real = new SingleNotifier();
-      await _showSingleChoiceDialog(context, real);
-      print(realSide); //Get real class from the dialogue
-      var uploaded = false;
-      uploaded = await uploadImage(
-          _image, res, realSide); //TODO: Finish upload function in sides.dart
-      await save(_image, res, realSide); //Saves image with correct naming
-    }
-    setState(() {
-      if (pickedFile != null) {
-        _image = File(pickedFile.path);
-      } else {
-        print('No image selected.');
-      }
-    });
+    await _initializeControllerFuture;
+    final image = await _controller.takePicture();
+    _image = File(image.path);
+    res = await predict(_image); //Predict using model
+    print(res);
+    SingleNotifier real = new SingleNotifier();
+    await _showSingleChoiceDialog(context, real);
+    print(realSide); //Get real class from the dialogue
+    var uploaded = false;
+    uploaded = await uploadImage(
+        _image, res, realSide); //TODO: Finish upload function in sides.dart
+    await save(_image, res, realSide); //Saves image with correct naming
+
+    // setState(() {
+    //   if (pickedFile != null) {
+    //     _image = File(pickedFile.path);
+    //   } else {
+    //     print('No image selected.');
+    //   }
+    // });
   }
 
   @override
@@ -166,14 +195,18 @@ class _MyHomePageState extends State<MyHomePage> {
       appBar: AppBar(
         title: Text('Image Picker Example'),
       ),
-      body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _image == null ? Text('No image selected.') : Image.file(_image!),
-              _image == null ? Text("No available results") : Text(res)
-            ],
-          )),
+      body: FutureBuilder<void>(
+        future: _initializeControllerFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.done) {
+            // If the Future is complete, display the preview.
+            return CameraPreview(_controller);
+          } else {
+            // Otherwise, display a loading indicator.
+            return const Center(child: CircularProgressIndicator());
+          }
+        },
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: getImage,
         tooltip: 'Pick Image',
