@@ -1,4 +1,4 @@
-DIAGONAL
+diagonal
 back
 front
 left
