@@ -92,7 +92,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Future getImage() async {
     await _pictureScreen.cameraInterface.initializeControllerFuture;
     XFile xImage =
-    await _pictureScreen.cameraInterface.controller.takePicture();
+        await _pictureScreen.cameraInterface.controller.takePicture();
     _imageFile = File(xImage.path);
     getFileSize(_imageFile, 2).then((value) => print("File size: $value"));
 
@@ -120,8 +120,7 @@ class _MyHomePageState extends State<MyHomePage> {
       _predictionText = "Model result: $_predictedSide";
       _showPictureButton = true;
     });
-    uploadImage(_imageFile, _predictedSide,
-        _realSide); //TODO: Finish upload function in sides.dart
+    uploadImage(_imageFile, _predictedSide, _realSide);
     save(_imageFile, _predictedSide,
         _realSide); //Saves image with correct naming
   }
@@ -232,12 +231,11 @@ class TakePictureScreenState extends State<TakePictureScreen> {
     // To display the current output from the Camera,
     // create a CameraController.
     widget.cameraInterface.controller = CameraController(
-      // Get a specific camera from the list of available cameras.
+        // Get a specific camera from the list of available cameras.
         widget.camera,
         // Define the resolution to use.
         ResolutionPreset.medium,
-        enableAudio: false
-    );
+        enableAudio: false);
 
     // Next, initialize the controller. This returns a Future.
     widget.cameraInterface.initializeControllerFuture =
@@ -321,18 +319,18 @@ Future<CarSides> _showSingleChoiceDialog(
                     mainAxisSize: MainAxisSize.min,
                     children: CarSides.sides
                         .map((e) => RadioListTile(
-                      title: Text(capitalize(e)),
-                      value: e,
-                      groupValue: _singleNotifier.currentSide,
-                      selected: _singleNotifier.currentSide == e,
-                      onChanged: (value) {
-                        if (value != _singleNotifier.currentSide) {
-                          print(
-                              "onChange: from ${_singleNotifier.currentSide} to $value");
-                          _singleNotifier.updateSide(value);
-                        }
-                      },
-                    ))
+                              title: Text(capitalize(e)),
+                              value: e,
+                              groupValue: _singleNotifier.currentSide,
+                              selected: _singleNotifier.currentSide == e,
+                              onChanged: (value) {
+                                if (value != _singleNotifier.currentSide) {
+                                  print(
+                                      "onChange: from ${_singleNotifier.currentSide} to $value");
+                                  _singleNotifier.updateSide(value);
+                                }
+                              },
+                            ))
                         .toList(),
                   ),
                 ),
@@ -356,10 +354,10 @@ class DisplayPictureScreen extends StatelessWidget {
   final String title;
 
   const DisplayPictureScreen(
-      this.image,
-      this.title, {
-        Key? key,
-      }) : super(key: key);
+    this.image,
+    this.title, {
+    Key? key,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
