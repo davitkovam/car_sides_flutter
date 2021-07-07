@@ -1,16 +1,16 @@
 library sides;
 
-import 'package:tflite/tflite.dart';
 import 'dart:io';
+import 'dart:math';
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:tflite/tflite.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:strings/strings.dart';
-import 'dart:math';
 
 class CarSides {
   // final List<String> _sides = ['Front', 'Back', 'Left', 'Right', 'Diagonal'];
@@ -35,7 +35,7 @@ class CarSides {
 
 Future<List<CarSides>> predict(
     File image) async //Predicts the image using the pretrained model
-    {
+{
   await Tflite.loadModel(
       model: "assets/model.tflite",
       labels: "assets/labels.txt",
@@ -54,8 +54,7 @@ Future<List<CarSides>> predict(
 
   List<CarSides> carSidesList = [];
   recognitions!.forEach((element) =>
-      carSidesList.add(CarSides(element['label'], element['confidence']))
-  );
+      carSidesList.add(CarSides(element['label'], element['confidence'])));
   // var result = [
   //   recognitions![0]['label'],
   //   recognitions[0]['confidence']
@@ -76,9 +75,9 @@ Future<bool> internetAvailable() async {
   return false;
 }
 
-Future<bool> uploadImage(File image, CarSides predictedSide,
-    CarSides realSide) async //In progress
-    {
+Future<bool> uploadImage(
+    File image, CarSides predictedSide, CarSides realSide) async //In progress
+{
   if (await internetAvailable()) {
     var now = DateTime.now();
     var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
@@ -118,9 +117,9 @@ Future<bool> uploadImage(File image, CarSides predictedSide,
   return false;
 }
 
-save(File? image, CarSides predictedSide,
+save(File image, CarSides predictedSide,
     CarSides realSide) async //Saves picture in phone
-    {
+{
   var now = DateTime.now();
   var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
   String currentTimeStamp = formatter.format(now);
@@ -140,10 +139,8 @@ save(File? image, CarSides predictedSide,
     fileFullPath = appDir.path + '/' + filename;
   }
 
-  if (image != null) {
-    final File localImage = await image.copy('$fileFullPath');
-    print("localImage.path: ${localImage.path}");
-  }
+  final File localImage = await image.copy('$fileFullPath');
+  print("localImage.path: ${localImage.path}");
 }
 
 getFileSize(File file, int decimals) async {

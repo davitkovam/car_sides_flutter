@@ -1,5 +1,5 @@
-import 'dart:async';
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
@@ -94,15 +94,15 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   late File _imageFile;
   late File _croppedImageFile;
 
-  late CarSides _predictedSide;
   late List<CarSides> _predictedSideList;
+  late CarSides _predictedSide;
   late CarSides _realSide;
+
+  String _predictionText = "Take picture first";
+  bool _pictureButtonActive = false;
 
   late TakePictureScreen _pictureScreen = new TakePictureScreen(widget.camera);
   final SingleNotifier _singleNotifier = new SingleNotifier();
-  String _predictionText = "Take picture first";
-
-  bool _showPictureButton = false;
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -131,7 +131,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   @override
   void dispose() {
     // Dispose of the controller when the widget is disposed.
-    print("HomePage dispose");
     WidgetsBinding.instance!.removeObserver(this);
     super.dispose();
   }
@@ -168,7 +167,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
     setState(() {
       _predictionText = "Model result: $_predictedSideList";
-      _showPictureButton = true;
+      _pictureButtonActive = true;
     });
     uploadImage(_croppedImageFile, _predictedSide, _realSide);
     save(_croppedImageFile, _predictedSide,
@@ -253,7 +252,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                         style: ElevatedButton.styleFrom(
                           textStyle: const TextStyle(fontSize: 20),
                         ),
-                        onPressed: _showPictureButton ? showImage : null,
+                        onPressed: _pictureButtonActive ? showImage : null,
                         child: const Text('Show picture'),
                       ),
                     ],
@@ -273,38 +272,24 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     );
   }
 
-// @override
-// Widget build(BuildContext context) {
-//   return Scaffold(
-//     appBar: AppBar(
-//       title: Text(widget.title),
-//     ),
-//     body: Column(children: [_pictureScreen, Text("Babushka")]),
-//     floatingActionButton: FloatingActionButton(
-//       onPressed: getImage,
-//       tooltip: 'Pick Image',
-//       child: Icon(Icons.add_a_photo),
-//     ),
-//     floatingActionButtonLocation: FloatingActionButtonLocation.miniEndFloat,
-//   );
-// }
-
   showImage({File? imageFile, CarSides? carSide, String? extraText}) async {
-    if (carSide == null) {
-      carSide = _predictedSide;
-    }
-    if (imageFile == null) {
-      imageFile = _croppedImageFile;
-    }
+    String title;
+    if (carSide == null) carSide = _predictedSide;
+
+    if (imageFile == null) imageFile = _croppedImageFile;
+
+    if (extraText == null)
+      title = carSide.toString();
+    else
+      title = carSide.toString() + ' ' + extraText;
+
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => DisplayPictureScreen(
 // Pass the automatically generated path to
 // the DisplayPictureScreen widget.
           imageFile!,
-          extraText == null
-              ? carSide.toString()
-              : carSide.toString() + ' ' + extraText,
+          title,
         ),
       ),
     );
@@ -326,7 +311,6 @@ class TakePictureScreen extends StatefulWidget {
 class TakePictureScreenState extends State<TakePictureScreen> {
   @override
   void initState() {
-    print("TakePictureScreen initState()");
     super.initState();
     // To display the current output from the Camera,
     // create a CameraController.
@@ -336,7 +320,6 @@ class TakePictureScreenState extends State<TakePictureScreen> {
   @override
   void dispose() {
     // Dispose of the controller when the widget is disposed.
-    print("Camera dispose");
     widget.cameraInterface.controller.dispose();
     widget.cameraInterface.cameraStarted = false;
     super.dispose();
@@ -344,8 +327,6 @@ class TakePictureScreenState extends State<TakePictureScreen> {
 
   @override
   Widget build(BuildContext context) {
-    print(
-        "Camera build, cameraStarted: ${widget.cameraInterface.cameraStarted}");
     return FutureBuilder<void>(
       future: widget.cameraInterface.initializeControllerFuture,
       builder: (context, snapshot) {
@@ -359,22 +340,6 @@ class TakePictureScreenState extends State<TakePictureScreen> {
       },
     );
   }
-
-// @override
-// Widget build(BuildContext context) {
-//   return FutureBuilder<void>(
-//     future: widget.cameraInterface.initializeControllerFuture,
-//     builder: (context, snapshot) {
-//       if (snapshot.connectionState == ConnectionState.done) {
-//         // If the Future is complete, display the preview.
-//         return CameraPreview(widget.cameraInterface.controller);
-//       } else {
-//         // Otherwise, display a loading indicator.
-//         return const Center(child: CircularProgressIndicator());
-//       }
-//     },
-//   );
-// }
 }
 
 class SingleNotifier extends ChangeNotifier {

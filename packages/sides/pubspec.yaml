@@ -10,11 +10,15 @@ dependencies:
   flutter:
     sdk: flutter
   tflite: ^1.1.0
-  strings: ^0.2.2
-  http: ^0.13.3
   intl: ^0.17.0
   path_provider: ^2.0.2
+  http: ^0.13.3
   http_parser: ^4.0.0
+  strings: ^0.2.2
+
+
+
+
 
 dev_dependencies:
   flutter_test:
