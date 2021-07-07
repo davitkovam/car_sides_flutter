@@ -7,12 +7,27 @@ import 'package:sides/sides.dart';
 import 'package:camera/camera.dart';
 import 'package:strings/strings.dart';
 import 'package:flutter_native_image/flutter_native_image.dart';
+import 'package:screen_state/screen_state.dart';
 
 //Possible classes
 
 class CameraInterface {
   late CameraController controller;
   late Future<void> initializeControllerFuture;
+  late bool cameraStarted = false;
+
+  controllerInitialize(camera) {
+    controller = CameraController(
+        // Get a specific camera from the list of available cameras.
+        camera,
+        // Define the resolution to use.
+        ResolutionPreset.veryHigh,
+        enableAudio: false);
+
+    // Next, initialize the controller. This returns a Future.
+    initializeControllerFuture = controller.initialize();
+    cameraStarted = true;
+  }
 }
 //All functions are in sides.dart -> packages/sides/lib/sides.dart
 
@@ -20,15 +35,16 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final cameras = await availableCameras();
   await CarSides.loadAsset();
-  print("Sides ${CarSides.sides}");
-  runApp(MultiProvider(
-    providers: [
-      ChangeNotifierProvider<SingleNotifier>(
-        create: (_) => SingleNotifier(),
-      )
-    ],
-    child: MyApp(cameras.first),
-  ));
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider<SingleNotifier>(
+          create: (_) => SingleNotifier(),
+        ),
+      ],
+      child: MyApp(cameras.first),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -80,6 +96,7 @@ class _MyHomePageState extends State<MyHomePage> {
   late File _croppedImageFile;
 
   late CarSides _predictedSide;
+  late List<CarSides> _predictedSideList;
   late CarSides _realSide;
 
   late TakePictureScreen _pictureScreen = new TakePictureScreen(widget.camera);
@@ -88,21 +105,51 @@ class _MyHomePageState extends State<MyHomePage> {
 
   bool _showPictureButton = false;
 
+  Screen _screen = Screen();
+
+  void onData(ScreenStateEvent event) {
+    if (_pictureScreen.cameraInterface.cameraStarted &&
+        event == ScreenStateEvent.SCREEN_OFF) {
+      print("SCREEN OFF");
+      _pictureScreen.cameraInterface.controller.dispose();
+      _pictureScreen.cameraInterface.cameraStarted = false;
+    } else if (!_pictureScreen.cameraInterface.cameraStarted &&
+        (event == ScreenStateEvent.SCREEN_ON ||
+            event == ScreenStateEvent.SCREEN_UNLOCKED)) {
+      print("SCREEN ON");
+      _pictureScreen = new TakePictureScreen(widget.camera);
+      _pictureScreen.controllerInitialize();
+      _pictureScreen.cameraInterface.initializeControllerFuture
+          .then((value) => setState(() {}));
+      _pictureScreen.cameraInterface.cameraStarted = true;
+    }
+  }
+
+  void startListening() {
+    try {
+      _screen.screenStateStream!.listen(onData);
+    } on ScreenStateException catch (exception) {
+      print(exception);
+    }
+  }
+
 //Take a picture
   Future getImage() async {
     await _pictureScreen.cameraInterface.initializeControllerFuture;
     XFile xImage =
         await _pictureScreen.cameraInterface.controller.takePicture();
     _imageFile = File(xImage.path);
-    getFileSize(_imageFile, 2).then((value) => print("File size: $value"));
+    getFileSize(_imageFile, 2).then((value) => print("Picture size: $value"));
 
     var decodedImage = await decodeImageFromList(_imageFile.readAsBytesSync());
-    print("height and width: ${decodedImage.height}, ${decodedImage.width}");
+    print("Picture resolution: ${decodedImage.height}x${decodedImage.width}");
 
     _croppedImageFile = await FlutterNativeImage.cropImage(
         _imageFile.path, 0, 0, decodedImage.width, decodedImage.width);
-    _predictedSide = await predict(_imageFile);
-    showImage();
+    _predictedSideList = await predict(_croppedImageFile);
+    _predictedSide = _predictedSideList[0];
+
+    showImage(extraText: "${decodedImage.height}x${decodedImage.width}");
     _realSide = await _showSingleChoiceDialog(context, _singleNotifier);
 
     // List<CarSides> completeList;
@@ -117,58 +164,105 @@ class _MyHomePageState extends State<MyHomePage> {
     print("predictedSide: $_predictedSide");
 
     setState(() {
-      _predictionText = "Model result: $_predictedSide";
+      _predictionText = "Model result: $_predictedSideList";
       _showPictureButton = true;
     });
-    uploadImage(_imageFile, _predictedSide, _realSide);
-    save(_imageFile, _predictedSide,
+    uploadImage(_croppedImageFile, _predictedSide, _realSide);
+    save(_croppedImageFile, _predictedSide,
         _realSide); //Saves image with correct naming
   }
 
   @override
   Widget build(BuildContext context) {
-    AppBar appBar = AppBar(
-      title: Text(widget.title),
-    );
     final width = MediaQuery.of(context).size.width;
     final height = MediaQuery.of(context).size.height;
     print("Device Width: $width, Height: $height");
 
+    startListening();
     return Scaffold(
-      appBar: appBar,
-      body: Stack(children: <Widget>[
-        _pictureScreen,
-        Column(children: [
-          Container(
-              width: width,
-              height: width,
-              decoration: BoxDecoration(
-                  border: Border.all(color: Colors.greenAccent, width: 4))),
-          Expanded(
-              child: Container(
+      appBar: AppBar(
+        title: Text(widget.title),
+      ),
+      // body: Stack(
+      //   children: <Widget>[
+      //     _pictureScreen,
+      //     Column(
+      //       children: [
+      //         Container(
+      //             width: width,
+      //             height: width,
+      //             decoration: BoxDecoration(
+      //                 border: Border.all(color: Colors.greenAccent, width: 4))),
+      //         DraggableScrollableSheet(
+      //           builder: (context, controller) => Container(
+      //             height: height,
+      //             color: Colors.white70,
+      //             child: ListView.builder(
+      //               controller: controller,
+      //               itemCount: _predictedSideList.length,
+      //               itemBuilder: (context, index) {
+      //                 final side = _predictedSideList[index];
+      //                 return ListTile(
+      //                   title: Text(
+      //                     side.label,
+      //                     style: TextStyle(fontSize: 24),
+      //                   ),
+      //                 );
+      //               },
+      //             ),
+      //           ),
+      //         ),
+      //       ],
+      //     ),
+      //   ],
+      // ),
+      body: Stack(
+        children: <Widget>[
+          _pictureScreen,
+          Column(
+            children: [
+              Container(
+                width: width,
+                height: width,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.greenAccent, width: 4),
+                ),
+              ),
+              Expanded(
+                child: Container(
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(20),
-                        topRight: Radius.circular(20)),
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
                     boxShadow: [
                       BoxShadow(color: Colors.white),
                     ],
                   ),
                   child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(_predictionText, style: TextStyle(fontSize: 20)),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                              textStyle: const TextStyle(fontSize: 20)),
-                          onPressed: _showPictureButton ? showImage : null,
-                          child: const Text('Show picture'),
-                        )
-                      ])))
-        ])
-      ]),
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _predictionText,
+                        style: TextStyle(fontSize: 20),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          textStyle: const TextStyle(fontSize: 20),
+                        ),
+                        onPressed: _showPictureButton ? showImage : null,
+                        child: const Text('Show picture'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: getImage,
         tooltip: 'Pick Image',
@@ -194,7 +288,7 @@ class _MyHomePageState extends State<MyHomePage> {
 //   );
 // }
 
-  showImage([File? imageFile, CarSides? carSide]) async {
+  showImage({File? imageFile, CarSides? carSide, String? extraText}) async {
     if (carSide == null) {
       carSide = _predictedSide;
     }
@@ -207,7 +301,9 @@ class _MyHomePageState extends State<MyHomePage> {
 // Pass the automatically generated path to
 // the DisplayPictureScreen widget.
           imageFile!,
-          carSide.toString(),
+          extraText == null
+              ? carSide.toString()
+              : carSide.toString() + ' ' + extraText,
         ),
       ),
     );
@@ -220,6 +316,8 @@ class TakePictureScreen extends StatefulWidget {
 
   TakePictureScreen(this.camera, {Key? key}) : super(key: key);
 
+  controllerInitialize() => cameraInterface.controllerInitialize(camera);
+
   @override
   TakePictureScreenState createState() => TakePictureScreenState();
 }
@@ -227,19 +325,11 @@ class TakePictureScreen extends StatefulWidget {
 class TakePictureScreenState extends State<TakePictureScreen> {
   @override
   void initState() {
+    print("TakePictureScreen initState()");
     super.initState();
     // To display the current output from the Camera,
     // create a CameraController.
-    widget.cameraInterface.controller = CameraController(
-        // Get a specific camera from the list of available cameras.
-        widget.camera,
-        // Define the resolution to use.
-        ResolutionPreset.medium,
-        enableAudio: false);
-
-    // Next, initialize the controller. This returns a Future.
-    widget.cameraInterface.initializeControllerFuture =
-        widget.cameraInterface.controller.initialize();
+    widget.cameraInterface.controllerInitialize(widget.camera);
   }
 
   @override
@@ -247,11 +337,13 @@ class TakePictureScreenState extends State<TakePictureScreen> {
     // Dispose of the controller when the widget is disposed.
     print("Camera dispose");
     widget.cameraInterface.controller.dispose();
+    widget.cameraInterface.cameraStarted = false;
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    print("Camera build");
     return FutureBuilder<void>(
       future: widget.cameraInterface.initializeControllerFuture,
       builder: (context, snapshot) {
@@ -309,42 +401,45 @@ Future<CarSides> _showSingleChoiceDialog(
       builder: (context) {
         _singleNotifier = Provider.of<SingleNotifier>(context);
         return WillPopScope(
-            onWillPop: () async => false,
-            child: AlertDialog(
-              title: Text("Select the real side!"),
-              content: SingleChildScrollView(
-                child: Container(
-                  width: double.infinity,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: CarSides.sides
-                        .map((e) => RadioListTile(
-                              title: Text(capitalize(e)),
-                              value: e,
-                              groupValue: _singleNotifier.currentSide,
-                              selected: _singleNotifier.currentSide == e,
-                              onChanged: (value) {
-                                if (value != _singleNotifier.currentSide) {
-                                  print(
-                                      "onChange: from ${_singleNotifier.currentSide} to $value");
-                                  _singleNotifier.updateSide(value);
-                                }
-                              },
-                            ))
-                        .toList(),
-                  ),
+          onWillPop: () async => false,
+          child: AlertDialog(
+            title: Text("Select the real side!"),
+            content: SingleChildScrollView(
+              child: Container(
+                width: double.infinity,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: CarSides.sides
+                      .map(
+                        (e) => RadioListTile(
+                          title: Text(capitalize(e)),
+                          value: e,
+                          groupValue: _singleNotifier.currentSide,
+                          selected: _singleNotifier.currentSide == e,
+                          onChanged: (value) {
+                            if (value != _singleNotifier.currentSide) {
+                              print(
+                                  "onChange: from ${_singleNotifier.currentSide} to $value");
+                              _singleNotifier.updateSide(value);
+                            }
+                          },
+                        ),
+                      )
+                      .toList(),
                 ),
               ),
-              actions: <Widget>[
-                new TextButton(
-                  child: new Text("OK"),
-                  onPressed: () {
-                    completer.complete(CarSides(_singleNotifier._currentSide));
-                    Navigator.of(context).pop();
-                  },
-                )
-              ],
-            ));
+            ),
+            actions: <Widget>[
+              new TextButton(
+                child: new Text("OK"),
+                onPressed: () {
+                  completer.complete(CarSides(_singleNotifier._currentSide));
+                  Navigator.of(context).pop();
+                },
+              )
+            ],
+          ),
+        );
       });
   return completer.future;
 }

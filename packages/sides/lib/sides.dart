@@ -2,6 +2,7 @@ library sides;
 
 import 'package:tflite/tflite.dart';
 import 'dart:io';
+import 'dart:async';
 import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
@@ -32,7 +33,7 @@ class CarSides {
   }
 }
 
-Future<CarSides> predict(
+Future<List<CarSides>> predict(
     File image) async //Predicts the image using the pretrained model
     {
   await Tflite.loadModel(
@@ -50,11 +51,16 @@ Future<CarSides> predict(
       threshold: 0.1,
       asynch: true);
   print("recognitions: $recognitions");
+
+  List<CarSides> carSidesList = [];
+  recognitions!.forEach((element) =>
+      carSidesList.add(CarSides(element['label'], element['confidence']))
+  );
   // var result = [
   //   recognitions![0]['label'],
   //   recognitions[0]['confidence']
   // ];
-  return CarSides(recognitions![0]['label'], recognitions[0]['confidence']);
+  return carSidesList;
 }
 
 Future<bool> internetAvailable() async {
@@ -70,14 +76,13 @@ Future<bool> internetAvailable() async {
   return false;
 }
 
-Future<bool> uploadImage(
-    File image, CarSides predictedSide, CarSides realSide) async //In progress
+Future<bool> uploadImage(File image, CarSides predictedSide,
+    CarSides realSide) async //In progress
     {
   if (await internetAvailable()) {
     var now = DateTime.now();
     var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
     String currentTimeStamp = formatter.format(now);
-    print("currentTimeStamp: $currentTimeStamp");
 
     //XY_Cars -> X = predicted, Y=real
     var X = predictedSide.firstLetter();
@@ -119,7 +124,6 @@ save(File? image, CarSides predictedSide,
   var now = DateTime.now();
   var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
   String currentTimeStamp = formatter.format(now);
-  print("currentTimeStamp: $currentTimeStamp");
 
   //XY_Cars -> X = predicted, Y=real
   var X = predictedSide.firstLetter();

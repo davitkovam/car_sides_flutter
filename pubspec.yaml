@@ -22,8 +22,6 @@ environment:
 
 
 dependencies:
-  intl: ^0.17.0
-  path_provider: ^2.0.2
   flutter:
     sdk: flutter
   image_picker: ^0.8.1+1
@@ -32,13 +30,11 @@ dependencies:
     path: packages/sides
   image_gallery_saver: '^1.6.9'
   provider: ^5.0.0
-  http: ^0.13.3
   async: ^2.6.0
   path: ^1.8.0
-  http_parser: ^4.0.0
   camera: ^0.8.1+3
-  strings: ^0.2.2
   flutter_native_image: ^0.0.6+1
+  screen_state: ^2.0.0
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
