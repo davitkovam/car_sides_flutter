@@ -7,7 +7,6 @@ import 'package:sides/sides.dart';
 import 'package:camera/camera.dart';
 import 'package:strings/strings.dart';
 import 'package:flutter_native_image/flutter_native_image.dart';
-import 'package:screen_state/screen_state.dart';
 
 //Possible classes
 
@@ -17,6 +16,7 @@ class CameraInterface {
   late bool cameraStarted = false;
 
   controllerInitialize(camera) {
+    cameraStarted = true;
     controller = CameraController(
         // Get a specific camera from the list of available cameras.
         camera,
@@ -26,7 +26,6 @@ class CameraInterface {
 
     // Next, initialize the controller. This returns a Future.
     initializeControllerFuture = controller.initialize();
-    cameraStarted = true;
   }
 }
 //All functions are in sides.dart -> packages/sides/lib/sides.dart
@@ -91,7 +90,7 @@ class MyHomePage extends StatefulWidget {
   _MyHomePageState createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   late File _imageFile;
   late File _croppedImageFile;
 
@@ -105,32 +104,36 @@ class _MyHomePageState extends State<MyHomePage> {
 
   bool _showPictureButton = false;
 
-  Screen _screen = Screen();
-
-  void onData(ScreenStateEvent event) {
-    if (_pictureScreen.cameraInterface.cameraStarted &&
-        event == ScreenStateEvent.SCREEN_OFF) {
-      print("SCREEN OFF");
-      _pictureScreen.cameraInterface.controller.dispose();
-      _pictureScreen.cameraInterface.cameraStarted = false;
-    } else if (!_pictureScreen.cameraInterface.cameraStarted &&
-        (event == ScreenStateEvent.SCREEN_ON ||
-            event == ScreenStateEvent.SCREEN_UNLOCKED)) {
-      print("SCREEN ON");
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    print("state: $state");
+    if (!_pictureScreen.cameraInterface.cameraStarted &&
+        state == AppLifecycleState.resumed) {
+      print("Initialize camera");
       _pictureScreen = new TakePictureScreen(widget.camera);
       _pictureScreen.controllerInitialize();
-      _pictureScreen.cameraInterface.initializeControllerFuture
-          .then((value) => setState(() {}));
       _pictureScreen.cameraInterface.cameraStarted = true;
+    } else if (_pictureScreen.cameraInterface.cameraStarted) {
+      print("Dispose camera");
+      _pictureScreen.cameraInterface.controller.dispose();
+      _pictureScreen.cameraInterface.cameraStarted = false;
     }
+    _pictureScreen.cameraInterface.initializeControllerFuture
+        .then((value) => setState(() {}));
   }
 
-  void startListening() {
-    try {
-      _screen.screenStateStream!.listen(onData);
-    } on ScreenStateException catch (exception) {
-      print(exception);
-    }
+  @override
+  initState() {
+    super.initState();
+    WidgetsBinding.instance!.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    // Dispose of the controller when the widget is disposed.
+    print("HomePage dispose");
+    WidgetsBinding.instance!.removeObserver(this);
+    super.dispose();
   }
 
 //Take a picture
@@ -177,8 +180,6 @@ class _MyHomePageState extends State<MyHomePage> {
     final width = MediaQuery.of(context).size.width;
     final height = MediaQuery.of(context).size.height;
     print("Device Width: $width, Height: $height");
-
-    startListening();
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
@@ -343,7 +344,8 @@ class TakePictureScreenState extends State<TakePictureScreen> {
 
   @override
   Widget build(BuildContext context) {
-    print("Camera build");
+    print(
+        "Camera build, cameraStarted: ${widget.cameraInterface.cameraStarted}");
     return FutureBuilder<void>(
       future: widget.cameraInterface.initializeControllerFuture,
       builder: (context, snapshot) {
