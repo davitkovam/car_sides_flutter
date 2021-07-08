@@ -1,23 +1,42 @@
 library sides;
 
-import 'package:path/path.dart' as path;
-
-import 'package:tflite/tflite.dart';
 import 'dart:io';
+import 'dart:math';
+import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:tflite/tflite.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
-import 'package:async/async.dart';
-import 'package:path/path.dart';
 import 'package:http_parser/http_parser.dart';
+import 'package:strings/strings.dart';
 
-import 'package:flutter/material.dart';
+class CarSides {
+  // final List<String> _sides = ['Front', 'Back', 'Left', 'Right', 'Diagonal'];
+  static late List<String> sides;
+  late String label;
+  late double confidence;
 
-predict(File? image) async //Predicts the image using the pretrained model
-    {
-  String? res = await Tflite.loadModel(
+  CarSides([this.label = "", this.confidence = 0.0]);
+
+  static loadAsset() async {
+    sides = (await rootBundle.loadString('assets/labels.txt')).split("\n");
+  }
+
+  firstLetter() {
+    return label[0].toUpperCase();
+  }
+
+  String toString() {
+    return capitalize(label) + ' ' + confidence.toStringAsFixed(3);
+  }
+}
+
+Future<List<CarSides>> predict(
+    File image) async //Predicts the image using the pretrained model
+{
+  await Tflite.loadModel(
       model: "assets/model.tflite",
       labels: "assets/labels.txt",
       numThreads: 1,
@@ -25,101 +44,109 @@ predict(File? image) async //Predicts the image using the pretrained model
       useGpuDelegate: false);
 
   var recognitions = await Tflite.runModelOnImage(
-      path: image!.path,
+      path: image.path,
       imageMean: 117.0,
       imageStd: 1.0,
       numResults: 5,
       threshold: 0.1,
       asynch: true);
+  print("recognitions: $recognitions");
 
-  var result = recognitions![0]['label'] +
-      "," +
-      recognitions[0]['confidence'].toStringAsPrecision(3);
-
-  return result;
+  List<CarSides> carSidesList = [];
+  recognitions!.forEach((element) =>
+      carSidesList.add(CarSides(element['label'], element['confidence'])));
+  // var result = [
+  //   recognitions![0]['label'],
+  //   recognitions[0]['confidence']
+  // ];
+  return carSidesList;
 }
 
-internetAvailable() async {
+Future<bool> internetAvailable() async {
   try {
     final result = await InternetAddress.lookup('example.com');
     if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
-      return 1;
+      return true;
     }
   } on SocketException catch (_) {
     print('not connected');
-    return 0;
+    return false;
   }
-  return 0;
+  return false;
 }
 
-uploadImage(File? image, String? pred, String real) async //In progress
-    {
-  if (await internetAvailable() == 1) {
+Future<bool> uploadImage(
+    File image, CarSides predictedSide, CarSides realSide) async //In progress
+{
+  if (await internetAvailable()) {
     var now = DateTime.now();
     var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
     String currentTimeStamp = formatter.format(now);
-    print(currentTimeStamp);
 
     //XY_Cars -> X = predicted, Y=real
-    var X = '${pred![0]}'.toUpperCase();
-    var Y = '${real[0]}'.toUpperCase();
+    var X = predictedSide.firstLetter();
+    var Y = realSide.firstLetter();
 
-    String fname =
+    String fileName =
         X.toString() + Y.toString() + "_" + "Cars" + currentTimeStamp + ".jpg";
 
     print("Internet Available");
-    var stream = new http.ByteStream(DelegatingStream.typed(image!.openRead()));
+    var stream = new http.ByteStream(image.openRead());
+    stream.cast();
     var length = await image.length();
 
     var uri = Uri.parse("https://carsides.coci.result.si/upload.php");
 
     var request = new http.MultipartRequest("POST", uri)
-      ..fields['name'] = fname
+      ..fields['name'] = fileName
       ..fields['User-Agent'] = "mememe";
+
     var multipartFile = new http.MultipartFile('image', stream, length,
-        filename: fname, contentType: new MediaType('image', 'jpg'));
+        filename: fileName, contentType: new MediaType('image', 'jpg'));
 
     request.files.add(multipartFile);
     var response = await request.send();
     print("statusCode: ${response.statusCode}");
     response.stream.transform(utf8.decoder).listen((value) {
-      print("listen: $value");
+      print("Answer: $value");
     });
-    print("uploaded image");
+    print("Image uploaded");
     return true;
   }
   print("Upload not successful!");
   return false;
 }
 
-save(File? image, String? pred, String real) async //Saves picture in phone
-    {
+save(File image, CarSides predictedSide,
+    CarSides realSide) async //Saves picture in phone
+{
   var now = DateTime.now();
   var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
   String currentTimeStamp = formatter.format(now);
-  print(currentTimeStamp);
 
   //XY_Cars -> X = predicted, Y=real
-  var X = '${pred![0]}'.toUpperCase();
-  var Y = '${real[0]}'.toUpperCase();
+  var X = predictedSide.firstLetter();
+  var Y = realSide.firstLetter();
 
   String filename =
       X.toString() + Y.toString() + "_" + "Cars" + currentTimeStamp + ".jpg";
 
-  print(filename);
+  print("filename: $filename");
 
   var appDir = await getExternalStorageDirectory();
-  String? dir = "";
+  late String fileFullPath;
   if (appDir != null) {
-    dir = appDir.path;
-  }
-  print(dir);
-  if (dir != null) {
-    dir += "/" + filename;
+    fileFullPath = appDir.path + '/' + filename;
   }
 
-  if (image != null) {
-    final File localImage = await image.copy('$dir');
-    print(localImage.path);
-  }
+  final File localImage = await image.copy('$fileFullPath');
+  print("localImage.path: ${localImage.path}");
+}
+
+getFileSize(File file, int decimals) async {
+  int bytes = await file.length();
+  if (bytes <= 0) return "0 B";
+  const suffixes = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+  var i = (log(bytes) / log(1024)).floor();
+  return ((bytes / pow(1024, i)).toStringAsFixed(decimals)) + ' ' + suffixes[i];
 }
