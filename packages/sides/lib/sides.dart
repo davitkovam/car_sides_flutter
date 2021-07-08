@@ -31,11 +31,15 @@ class CarSides {
   String toString() {
     return capitalize(label) + ' ' + confidence.toStringAsFixed(3);
   }
+
+  String confidenceToPercent() {
+    return "${(confidence * 100).round()}%";
+  }
 }
 
 Future<List<CarSides>> predict(
     File image) async //Predicts the image using the pretrained model
-{
+    {
   await Tflite.loadModel(
       model: "assets/model.tflite",
       labels: "assets/labels.txt",
@@ -75,9 +79,9 @@ Future<bool> internetAvailable() async {
   return false;
 }
 
-Future<bool> uploadImage(
-    File image, CarSides predictedSide, CarSides realSide) async //In progress
-{
+Future<bool> uploadImage(File image, CarSides predictedSide,
+    CarSides realSide) async //In progress
+    {
   if (await internetAvailable()) {
     var now = DateTime.now();
     var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
@@ -119,7 +123,7 @@ Future<bool> uploadImage(
 
 save(File image, CarSides predictedSide,
     CarSides realSide) async //Saves picture in phone
-{
+    {
   var now = DateTime.now();
   var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
   String currentTimeStamp = formatter.format(now);
@@ -143,7 +147,7 @@ save(File image, CarSides predictedSide,
   print("localImage.path: ${localImage.path}");
 }
 
-getFileSize(File file, int decimals) async {
+Future<String> getFileSize(File file, int decimals) async {
   int bytes = await file.length();
   if (bytes <= 0) return "0 B";
   const suffixes = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];

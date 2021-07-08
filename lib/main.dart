@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -21,7 +22,7 @@ class CameraInterface {
         // Get a specific camera from the list of available cameras.
         camera,
         // Define the resolution to use.
-        ResolutionPreset.veryHigh,
+        ResolutionPreset.medium,
         enableAudio: false);
 
     // Next, initialize the controller. This returns a Future.
@@ -90,16 +91,38 @@ class MyHomePage extends StatefulWidget {
   _MyHomePageState createState() => _MyHomePageState();
 }
 
+class Img {
+  final File file;
+  ui.Image? uiImage;
+  String? size;
+
+  int get width => uiImage!.width;
+
+  int get height => uiImage!.height;
+
+  String get resolution => "$width" + "x" + "$height";
+
+  String toString() {
+    return resolution + " " + size!;
+  }
+
+  Img(this.file, [this.uiImage, this.size]);
+}
+
 class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   late File _imageFile;
-  late File _croppedImageFile;
+  late Img _croppedImage;
 
-  late List<CarSides> _predictedSideList;
+  List<CarSides>? _predictedSideList;
   late CarSides _predictedSide;
   late CarSides _realSide;
 
-  String _predictionText = "Take picture first";
   bool _pictureButtonActive = false;
+
+  late DraggableSheet _draggableScrollableWidget;
+  double _initialChildSize = 0.5;
+  double _minChildSize = 0.1;
+  double _maxChildSize = 0.5;
 
   late TakePictureScreen _pictureScreen = new TakePictureScreen(widget.camera);
   final SingleNotifier _singleNotifier = new SingleNotifier();
@@ -144,33 +167,31 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     getFileSize(_imageFile, 2).then((value) => print("Picture size: $value"));
 
     var decodedImage = await decodeImageFromList(_imageFile.readAsBytesSync());
-    print("Picture resolution: ${decodedImage.height}x${decodedImage.width}");
+    // print("Picture resolution: ${decodedImage.height}x${decodedImage.width}");
 
-    _croppedImageFile = await FlutterNativeImage.cropImage(
-        _imageFile.path, 0, 0, decodedImage.width, decodedImage.width);
-    _predictedSideList = await predict(_croppedImageFile);
-    _predictedSide = _predictedSideList[0];
+    _croppedImage = Img(await FlutterNativeImage.cropImage(
+        _imageFile.path, 0, 0, decodedImage.width, decodedImage.width));
+    _croppedImage.uiImage =
+        await decodeImageFromList(_croppedImage.file.readAsBytesSync());
+    _croppedImage.size = await getFileSize(_imageFile, 2);
+    _predictedSideList = await predict(_croppedImage.file);
+    _predictedSide = _predictedSideList![0];
 
-    showImage(extraText: "${decodedImage.height}x${decodedImage.width}");
+    showImage();
     _realSide = await _showSingleChoiceDialog(context, _singleNotifier);
-
-    // List<CarSides> completeList;
-    // completeList = await Future.wait([
-    //   _showSingleChoiceDialog(context, _singleNotifier),
-    //   predict(_imageFile).then((value) => showImage(_croppedImageFile, carSide: value))
-    // ]);
-    // _realSide = completeList[0];
-    // _predictedSide = completeList[1];
 
     print("realSide: $_realSide");
     print("predictedSide: $_predictedSide");
 
+    _initialChildSize = _predictedSideList!.length * 0.1 + 0.1;
+    _minChildSize = 0.3;
+    _maxChildSize = _predictedSideList!.length * 0.1 + 0.1;
+    print("_maxChildSize: $_maxChildSize");
     setState(() {
-      _predictionText = "Model result: $_predictedSideList";
-      _pictureButtonActive = true;
+      // _maxChildSize = _predictedSideList!.length * 0.1;
     });
-    uploadImage(_croppedImageFile, _predictedSide, _realSide);
-    save(_croppedImageFile, _predictedSide,
+    uploadImage(_croppedImage.file, _predictedSide, _realSide);
+    save(_croppedImage.file, _predictedSide,
         _realSide); //Saves image with correct naming
   }
 
@@ -183,84 +204,18 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       appBar: AppBar(
         title: Text(widget.title),
       ),
-      // body: Stack(
-      //   children: <Widget>[
-      //     _pictureScreen,
-      //     Column(
-      //       children: [
-      //         Container(
-      //             width: width,
-      //             height: width,
-      //             decoration: BoxDecoration(
-      //                 border: Border.all(color: Colors.greenAccent, width: 4))),
-      //         DraggableScrollableSheet(
-      //           builder: (context, controller) => Container(
-      //             height: height,
-      //             color: Colors.white70,
-      //             child: ListView.builder(
-      //               controller: controller,
-      //               itemCount: _predictedSideList.length,
-      //               itemBuilder: (context, index) {
-      //                 final side = _predictedSideList[index];
-      //                 return ListTile(
-      //                   title: Text(
-      //                     side.label,
-      //                     style: TextStyle(fontSize: 24),
-      //                   ),
-      //                 );
-      //               },
-      //             ),
-      //           ),
-      //         ),
-      //       ],
-      //     ),
-      //   ],
-      // ),
       body: Stack(
-        children: <Widget>[
+        children: [
           _pictureScreen,
-          Column(
-            children: [
-              Container(
-                width: width,
-                height: width,
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.greenAccent, width: 4),
-                ),
-              ),
-              Expanded(
-                child: Container(
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(20),
-                      topRight: Radius.circular(20),
-                    ),
-                    boxShadow: [
-                      BoxShadow(color: Colors.white),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        _predictionText,
-                        style: TextStyle(fontSize: 20),
-                      ),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          textStyle: const TextStyle(fontSize: 20),
-                        ),
-                        onPressed: _pictureButtonActive ? showImage : null,
-                        child: const Text('Show picture'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+          Container(
+            width: width,
+            height: width,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.greenAccent, width: 4),
+            ),
           ),
+          DraggableSheet(_initialChildSize, _minChildSize, _maxChildSize,
+              _predictedSideList, _pictureButtonActive, showImage),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -273,25 +228,132 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   showImage({File? imageFile, CarSides? carSide, String? extraText}) async {
-    String title;
     if (carSide == null) carSide = _predictedSide;
 
-    if (imageFile == null) imageFile = _croppedImageFile;
+    if (imageFile == null) imageFile = _croppedImage.file;
 
-    if (extraText == null)
-      title = carSide.toString();
-    else
-      title = carSide.toString() + ' ' + extraText;
-
+    if (extraText == null) extraText = _croppedImage.toString();
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => DisplayPictureScreen(
 // Pass the automatically generated path to
 // the DisplayPictureScreen widget.
           imageFile!,
-          title,
+          carSide.toString(),
+          text: extraText,
         ),
       ),
+    );
+  }
+
+  List<Widget> predictionListWidget() {
+    List<Widget> widgetsList = [];
+    _predictedSideList!
+        .forEach((element) => widgetsList.add(Text(element.label)));
+    return widgetsList;
+  }
+}
+
+class ColumnBuilder extends StatelessWidget {
+  final IndexedWidgetBuilder itemBuilder;
+  final int itemCount;
+
+  const ColumnBuilder({
+    Key? key,
+    required this.itemBuilder,
+    required this.itemCount,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return new Column(
+      children: new List.generate(
+          this.itemCount, (index) => this.itemBuilder(context, index)).toList(),
+    );
+  }
+}
+
+class DraggableSheet extends StatefulWidget {
+  final double _initialChildSize;
+  final double _minChildSize;
+  final double _maxChildSize;
+  final List<CarSides>? _predictedSideList;
+  final bool _pictureButtonActive;
+  final Function() _showImage;
+
+  DraggableSheet(this._initialChildSize, this._minChildSize, this._maxChildSize,
+      this._predictedSideList, this._pictureButtonActive, this._showImage);
+
+  _DraggableSheetState createState() => _DraggableSheetState();
+}
+
+class _DraggableSheetState extends State<DraggableSheet> {
+  @override
+  Widget build(BuildContext context) {
+    setState(() {});
+    print(
+        "initial: ${widget._initialChildSize}, min: ${widget._minChildSize}, max: ${widget._maxChildSize}");
+    return new DraggableScrollableSheet(
+      initialChildSize: widget._initialChildSize,
+      minChildSize: widget._minChildSize,
+      maxChildSize: widget._maxChildSize,
+      builder: (BuildContext context, ScrollController scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+            boxShadow: [
+              BoxShadow(color: Colors.white),
+            ],
+          ),
+          child: ListView.separated(
+            scrollDirection: Axis.vertical,
+            shrinkWrap: true,
+            controller: scrollController,
+            itemCount: widget._predictedSideList == null
+                ? 1
+                : widget._predictedSideList!.length + 1,
+            itemBuilder: (BuildContext context, int index) {
+              final textStyle = TextStyle(fontSize: 20);
+              if (index == 0) {
+                return Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      textStyle: textStyle,
+                    ),
+                    onPressed:
+                        widget._pictureButtonActive ? widget._showImage : null,
+                    child: const Text('Show picture'),
+                  ),
+                );
+              }
+              return Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    Text(
+                      capitalize(widget._predictedSideList![index - 1].label),
+                      style: textStyle,
+                    ),
+                    Spacer(),
+                    Text(
+                      widget._predictedSideList![index - 1]
+                          .confidenceToPercent(),
+                      style: textStyle,
+                    ),
+                  ],
+                ),
+              );
+            },
+            separatorBuilder: (BuildContext context, int index) =>
+                const Divider(),
+          ),
+        );
+      },
     );
   }
 }
@@ -414,10 +476,12 @@ Future<CarSides> _showSingleChoiceDialog(
 class DisplayPictureScreen extends StatelessWidget {
   final File image;
   final String title;
+  final String? text;
 
   const DisplayPictureScreen(
     this.image,
     this.title, {
+    this.text,
     Key? key,
   }) : super(key: key);
 
@@ -427,12 +491,35 @@ class DisplayPictureScreen extends StatelessWidget {
       appBar: AppBar(title: Text(title)),
       // The image is stored as a file on the device. Use the `Image.file`
       // constructor with the given path to display the image.
-      body: Image.file(
-        image,
-        fit: BoxFit.fitWidth,
+      body: Container(
         width: double.infinity,
         height: double.infinity,
-        alignment: Alignment.center,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.file(
+              image,
+              fit: BoxFit.fitWidth,
+              width: double.infinity,
+              alignment: Alignment.center,
+            ),
+            Container(
+                padding: EdgeInsets.all(10),
+                margin: EdgeInsets.only(top: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white70,
+                  borderRadius: BorderRadius.all(
+                    Radius.circular(20),
+                  ),
+                ),
+                child: text != null
+                    ? Text(
+                        text!,
+                        // style: TextStyle(color: Colors.white),
+                      )
+                    : null),
+          ],
+        ),
       ),
       backgroundColor: Colors.black,
     );
