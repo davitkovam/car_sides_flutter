@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -21,7 +22,7 @@ class CameraInterface {
         // Get a specific camera from the list of available cameras.
         camera,
         // Define the resolution to use.
-        ResolutionPreset.veryHigh,
+        ResolutionPreset.medium,
         enableAudio: false);
 
     // Next, initialize the controller. This returns a Future.
@@ -90,53 +91,45 @@ class MyHomePage extends StatefulWidget {
   _MyHomePageState createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
-  late File _imageFile;
-  late File _croppedImageFile;
+class Img {
+  final File file;
+  ui.Image? uiImage;
+  String? size;
 
-  late List<CarSides> _predictedSideList;
+  int get width => uiImage!.width;
+
+  int get height => uiImage!.height;
+
+  String get resolution => "$width" + "x" + "$height";
+
+  String toString() {
+    return resolution + " " + size!;
+  }
+
+  Img(this.file, [this.uiImage, this.size]);
+}
+
+class _MyHomePageState extends State<MyHomePage> {
+  late File _imageFile;
+  Img? _croppedImage;
+
+  List<CarSides>? _predictedSideList;
   late CarSides _predictedSide;
   late CarSides _realSide;
-
-  String _predictionText = "Take picture first";
-  bool _pictureButtonActive = false;
 
   late TakePictureScreen _pictureScreen = new TakePictureScreen(widget.camera);
   final SingleNotifier _singleNotifier = new SingleNotifier();
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    print("state: $state");
-    if (!_pictureScreen.cameraInterface.cameraStarted &&
-        state == AppLifecycleState.resumed) {
-      print("Initialize camera");
-      _pictureScreen = new TakePictureScreen(widget.camera);
-      _pictureScreen.controllerInitialize();
-      _pictureScreen.cameraInterface.cameraStarted = true;
-    } else if (_pictureScreen.cameraInterface.cameraStarted) {
-      print("Dispose camera");
-      _pictureScreen.cameraInterface.controller.dispose();
-      _pictureScreen.cameraInterface.cameraStarted = false;
-    }
-    _pictureScreen.cameraInterface.initializeControllerFuture
-        .then((value) => setState(() {}));
-  }
-
-  @override
-  initState() {
-    super.initState();
-    WidgetsBinding.instance!.addObserver(this);
-  }
-
-  @override
-  void dispose() {
-    // Dispose of the controller when the widget is disposed.
-    WidgetsBinding.instance!.removeObserver(this);
-    super.dispose();
-  }
+  int _selectedIndex = 0;
+  PageController pageController = PageController(
+    initialPage: 0,
+    keepPage: true,
+  );
 
 //Take a picture
   Future getImage() async {
+    print(
+        "resolution ${_pictureScreen.cameraInterface.controller.resolutionPreset}");
     await _pictureScreen.cameraInterface.initializeControllerFuture;
     XFile xImage =
         await _pictureScreen.cameraInterface.controller.takePicture();
@@ -146,161 +139,102 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     var decodedImage = await decodeImageFromList(_imageFile.readAsBytesSync());
     print("Picture resolution: ${decodedImage.height}x${decodedImage.width}");
 
-    _croppedImageFile = await FlutterNativeImage.cropImage(
-        _imageFile.path, 0, 0, decodedImage.width, decodedImage.width);
-    _predictedSideList = await predict(_croppedImageFile);
-    _predictedSide = _predictedSideList[0];
+    _croppedImage = Img(await FlutterNativeImage.cropImage(
+        _imageFile.path, (decodedImage.height - decodedImage.width) ~/ 2, 0, decodedImage.width, decodedImage.width));
+    _croppedImage!.uiImage =
+        await decodeImageFromList(_croppedImage!.file.readAsBytesSync());
+    _croppedImage!.size = await getFileSize(_imageFile, 2);
+    _predictedSideList = await predict(_croppedImage!.file);
+    _predictedSide = _predictedSideList![0];
 
-    showImage(extraText: "${decodedImage.height}x${decodedImage.width}");
+    setState(() {
+      _onItemTapped(1);
+    });
     _realSide = await _showSingleChoiceDialog(context, _singleNotifier);
-
-    // List<CarSides> completeList;
-    // completeList = await Future.wait([
-    //   _showSingleChoiceDialog(context, _singleNotifier),
-    //   predict(_imageFile).then((value) => showImage(_croppedImageFile, carSide: value))
-    // ]);
-    // _realSide = completeList[0];
-    // _predictedSide = completeList[1];
 
     print("realSide: $_realSide");
     print("predictedSide: $_predictedSide");
 
-    setState(() {
-      _predictionText = "Model result: $_predictedSideList";
-      _pictureButtonActive = true;
-    });
-    uploadImage(_croppedImageFile, _predictedSide, _realSide);
-    save(_croppedImageFile, _predictedSide,
+    setState(() {});
+    uploadImage(_croppedImage!.file, _predictedSide, _realSide);
+    save(_croppedImage!.file, _predictedSide,
         _realSide); //Saves image with correct naming
   }
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final height = MediaQuery.of(context).size.height;
-    print("Device Width: $width, Height: $height");
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
       ),
-      // body: Stack(
-      //   children: <Widget>[
-      //     _pictureScreen,
-      //     Column(
-      //       children: [
-      //         Container(
-      //             width: width,
-      //             height: width,
-      //             decoration: BoxDecoration(
-      //                 border: Border.all(color: Colors.greenAccent, width: 4))),
-      //         DraggableScrollableSheet(
-      //           builder: (context, controller) => Container(
-      //             height: height,
-      //             color: Colors.white70,
-      //             child: ListView.builder(
-      //               controller: controller,
-      //               itemCount: _predictedSideList.length,
-      //               itemBuilder: (context, index) {
-      //                 final side = _predictedSideList[index];
-      //                 return ListTile(
-      //                   title: Text(
-      //                     side.label,
-      //                     style: TextStyle(fontSize: 24),
-      //                   ),
-      //                 );
-      //               },
-      //             ),
-      //           ),
-      //         ),
-      //       ],
-      //     ),
-      //   ],
-      // ),
-      body: Stack(
-        children: <Widget>[
-          _pictureScreen,
-          Column(
-            children: [
-              Container(
-                width: width,
-                height: width,
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.greenAccent, width: 4),
-                ),
-              ),
-              Expanded(
-                child: Container(
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(20),
-                      topRight: Radius.circular(20),
-                    ),
-                    boxShadow: [
-                      BoxShadow(color: Colors.white),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        _predictionText,
-                        style: TextStyle(fontSize: 20),
-                      ),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          textStyle: const TextStyle(fontSize: 20),
-                        ),
-                        onPressed: _pictureButtonActive ? showImage : null,
-                        child: const Text('Show picture'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
+      body: buildPageView(),
+      bottomNavigationBar: BottomNavigationBar(
+        items: buildBottomNavBarItems(),
+        currentIndex: _selectedIndex,
+        selectedItemColor: Colors.amber[800],
+        onTap: _onItemTapped,
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: getImage,
-        tooltip: 'Pick Image',
-        child: Icon(Icons.add_a_photo),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.miniEndFloat,
+      floatingActionButton: _buttonFAB(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
 
-  showImage({File? imageFile, CarSides? carSide, String? extraText}) async {
-    String title;
-    if (carSide == null) carSide = _predictedSide;
-
-    if (imageFile == null) imageFile = _croppedImageFile;
-
-    if (extraText == null)
-      title = carSide.toString();
-    else
-      title = carSide.toString() + ' ' + extraText;
-
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => DisplayPictureScreen(
-// Pass the automatically generated path to
-// the DisplayPictureScreen widget.
-          imageFile!,
-          title,
-        ),
-      ),
+  Widget buildPageView() {
+    return PageView(
+      controller: pageController,
+      onPageChanged: _pageChanged,
+      children: <Widget>[
+        _pictureScreen,
+        DisplayPictureScreen(_croppedImage, _predictedSideList),
+      ],
     );
+  }
+
+  void _pageChanged(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+      pageController.animateToPage(index,
+          duration: Duration(milliseconds: 500), curve: Curves.ease);
+    });
+  }
+
+  List<BottomNavigationBarItem> buildBottomNavBarItems() {
+    return [
+      BottomNavigationBarItem(
+        icon: Icon(Icons.camera),
+        label: 'Camera',
+      ),
+      BottomNavigationBarItem(
+        icon: Icon(Icons.image),
+        label: 'Image',
+      ),
+    ];
+  }
+
+  _buttonFAB() {
+    if (_selectedIndex == 0)
+      return FloatingActionButton(
+          onPressed: getImage,
+          tooltip: 'Pick Image',
+          child: Icon(Icons.add_a_photo));
+    else
+      return null;
   }
 }
 
 class TakePictureScreen extends StatefulWidget {
-  final CameraDescription camera;
+  final CameraDescription? camera;
   final CameraInterface cameraInterface = new CameraInterface();
 
-  TakePictureScreen(this.camera, {Key? key}) : super(key: key);
+  TakePictureScreen(this.camera, {Key? key}) : super(key: key) {
+    // controllerInitialize();
+  }
 
   controllerInitialize() => cameraInterface.controllerInitialize(camera);
 
@@ -308,13 +242,33 @@ class TakePictureScreen extends StatefulWidget {
   TakePictureScreenState createState() => TakePictureScreenState();
 }
 
-class TakePictureScreenState extends State<TakePictureScreen> {
+class TakePictureScreenState extends State<TakePictureScreen>
+    with WidgetsBindingObserver {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    print("state: $state");
+    print("cameraStarted: ${widget.cameraInterface.cameraStarted}");
+    if (!widget.cameraInterface.cameraStarted &&
+        state == AppLifecycleState.resumed) {
+      widget.controllerInitialize();
+      print("Initialize camera");
+      widget.cameraInterface.cameraStarted = true;
+      widget.cameraInterface.initializeControllerFuture
+          .then((value) => setState(() {}));
+    } else if (widget.cameraInterface.cameraStarted) {
+      print("Dispose camera");
+      widget.cameraInterface.controller.dispose();
+      widget.cameraInterface.cameraStarted = false;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     // To display the current output from the Camera,
     // create a CameraController.
-    widget.cameraInterface.controllerInitialize(widget.camera);
+    WidgetsBinding.instance!.addObserver(this);
+    widget.controllerInitialize();
   }
 
   @override
@@ -322,22 +276,42 @@ class TakePictureScreenState extends State<TakePictureScreen> {
     // Dispose of the controller when the widget is disposed.
     widget.cameraInterface.controller.dispose();
     widget.cameraInterface.cameraStarted = false;
+    WidgetsBinding.instance!.removeObserver(this);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<void>(
-      future: widget.cameraInterface.initializeControllerFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.done) {
-          // If the Future is complete, display the preview.
-          return CameraPreview(widget.cameraInterface.controller);
-        } else {
-          // Otherwise, display a loading indicator.
-          return const Center(child: CircularProgressIndicator());
-        }
-      },
+    final width = MediaQuery.of(context).size.width;
+    final height = MediaQuery.of(context).size.height;
+    print("Device Width: $width, Height: $height");
+
+    return Container(
+      color: Colors.black,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          FutureBuilder<void>(
+            future: widget.cameraInterface.initializeControllerFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.done) {
+                // If the Future is complete, display the preview.
+                return CameraPreview(widget.cameraInterface.controller);
+              } else {
+                // Otherwise, display a loading indicator.
+                return const Center(child: CircularProgressIndicator());
+              }
+            },
+          ),
+          Container(
+            width: width,
+            height: width,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.greenAccent, width: 4),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -412,29 +386,54 @@ Future<CarSides> _showSingleChoiceDialog(
 }
 
 class DisplayPictureScreen extends StatelessWidget {
-  final File image;
-  final String title;
+  final Img? image;
+  final List<CarSides>? carSidesList;
 
   const DisplayPictureScreen(
     this.image,
-    this.title, {
+    this.carSidesList, {
     Key? key,
   }) : super(key: key);
 
+  List<Widget> description() {
+    List<Widget> widgetList = [];
+    widgetList.add(Text(image.toString()));
+    carSidesList!
+        .forEach((element) => widgetList.add(Text(element.toString())));
+    return widgetList;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      // The image is stored as a file on the device. Use the `Image.file`
-      // constructor with the given path to display the image.
-      body: Image.file(
-        image,
-        fit: BoxFit.fitWidth,
-        width: double.infinity,
-        height: double.infinity,
-        alignment: Alignment.center,
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: Colors.black,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (image != null)
+            Image.file(
+              image!.file,
+              // fit: BoxFit.fitWidth,
+              // width: double.infinity,
+              alignment: Alignment.center,
+            ),
+          Container(
+            padding: EdgeInsets.all(10),
+            margin: EdgeInsets.only(top: 10),
+            decoration: BoxDecoration(
+              color: Colors.white70,
+              borderRadius: BorderRadius.all(
+                Radius.circular(20),
+              ),
+            ),
+            child: Column(
+              children: description(),
+            ),
+          ),
+        ],
       ),
-      backgroundColor: Colors.black,
     );
   }
 }
