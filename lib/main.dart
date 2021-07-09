@@ -19,7 +19,7 @@ class CameraInterface {
   controllerInitialize(camera) {
     cameraStarted = true;
     controller = CameraController(
-        // Get a specific camera from the list of available cameras.
+      // Get a specific camera from the list of available cameras.
         camera,
         // Define the resolution to use.
         ResolutionPreset.medium,
@@ -117,11 +117,15 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   late CarSides _predictedSide;
   late CarSides _realSide;
 
-  bool _pictureButtonActive = false;
-  double bottomSheetHeight = 68;
+  // bool _pictureButtonActive = false;
+  // double bottomSheetHeight = 68;
 
   late TakePictureScreen _pictureScreen = new TakePictureScreen(widget.camera);
   final SingleNotifier _singleNotifier = new SingleNotifier();
+
+  int _currentIndex = 0;
+
+
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -154,59 +158,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  Widget createText() {
-    final textStyle = TextStyle(fontSize: 20);
-    List<Widget> textList = [];
-    textList.add(Row(
-      mainAxisAlignment: MainAxisAlignment.spaceAround,
-      children: [
-        TextButton(
-          style: TextButton.styleFrom(
-            textStyle: TextStyle(fontSize: 20),
-            padding: EdgeInsets.symmetric(vertical: 10),
-          ),
-          onPressed: _pictureButtonActive ? showImage : null,
-          child: const Text('Show picture'),
-        ),
-        Spacer(),
-        TextButton(
-          style: TextButton.styleFrom(
-            textStyle: TextStyle(fontSize: 20),
-            padding: EdgeInsets.symmetric(vertical: 10),
-          ),
-          onPressed: getImage,
-          child: const Text('Take picture'),
-        )
-      ],
-    ));
-    if (_predictedSideList != null)
-      _predictedSideList!.forEach((element) {
-        textList.add(Divider());
-        textList.add(Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            Text(
-              capitalize(element.label),
-              style: textStyle,
-            ),
-            Spacer(),
-            Text(
-              element.confidenceToPercent(),
-              style: textStyle,
-            ),
-          ],
-        ));
-      });
-    return Padding(
-        padding: EdgeInsets.symmetric(horizontal: 30),
-        child: Column(children: textList));
-  }
-
 //Take a picture
   Future getImage() async {
     await _pictureScreen.cameraInterface.initializeControllerFuture;
     XFile xImage =
-        await _pictureScreen.cameraInterface.controller.takePicture();
+    await _pictureScreen.cameraInterface.controller.takePicture();
     _imageFile = File(xImage.path);
     getFileSize(_imageFile, 2).then((value) => print("Picture size: $value"));
 
@@ -216,63 +172,57 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     _croppedImage = Img(await FlutterNativeImage.cropImage(
         _imageFile.path, 0, 0, decodedImage.width, decodedImage.width));
     _croppedImage.uiImage =
-        await decodeImageFromList(_croppedImage.file.readAsBytesSync());
+    await decodeImageFromList(_croppedImage.file.readAsBytesSync());
     _croppedImage.size = await getFileSize(_imageFile, 2);
     _predictedSideList = await predict(_croppedImage.file);
     _predictedSide = _predictedSideList![0];
 
-    showImage();
+    // showImage();
     _realSide = await _showSingleChoiceDialog(context, _singleNotifier);
 
     print("realSide: $_realSide");
     print("predictedSide: $_predictedSide");
 
     setState(() {
-      bottomSheetHeight = _predictedSideList!.length * 39 + 68;
+      // bottomSheetHeight = _predictedSideList!.length * 39 + 68;
     });
     uploadImage(_croppedImage.file, _predictedSide, _realSide);
     save(_croppedImage.file, _predictedSide,
         _realSide); //Saves image with correct naming
   }
 
+
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final height = MediaQuery.of(context).size.height;
-    print("Device Width: $width, Height: $height");
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
       ),
-      body: Stack(
-        children: [
-          _pictureScreen,
-          Container(
-            width: width,
-            height: width,
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.greenAccent, width: 4),
-            ),
+      body: [_pictureScreen, showImage()].elementAt(_currentIndex),
+      bottomNavigationBar: BottomNavigationBar(
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: Icon(Icons.camera),
+            label: 'Camera',
           ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              width: width,
-              height: bottomSheetHeight,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(20),
-                ),
-                boxShadow: [
-                  BoxShadow(color: Colors.white),
-                ],
-              ),
-              child: createText(),
-            ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.image),
+            label: 'Image',
           ),
         ],
+        currentIndex: _currentIndex,
+        onTap: (int index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: getImage,
+        tooltip: 'Pick Image',
+        child: Icon(Icons.add_a_photo),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
 
@@ -284,115 +234,38 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     if (extraText == null) extraText = _croppedImage.toString();
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => DisplayPictureScreen(
+        builder: (context) =>
+            DisplayPictureScreen(
 // Pass the automatically generated path to
 // the DisplayPictureScreen widget.
-          imageFile!,
-          carSide.toString(),
-          text: extraText,
-        ),
+              imageFile!,
+              carSide.toString(),
+              text: extraText,
+            ),
       ),
     );
   }
-
-  List<Widget> predictionListWidget() {
-    List<Widget> widgetsList = [];
-    _predictedSideList!
-        .forEach((element) => widgetsList.add(Text(element.label)));
-    return widgetsList;
-  }
 }
 
-createTexttextfields(int d) {
-  var textEditingControllers = <TextEditingController>[];
-
-  var textFields = <TextField>[];
-  var list = new List<int>.generate(d, (i) => i + 1);
-  print(list);
-
-  list.forEach((i) {
-    var textEditingController = new TextEditingController(text: "test $i");
-    textEditingControllers.add(textEditingController);
-    return textFields.add(new TextField(controller: textEditingController));
-  });
-  return textFields;
-}
-
-class DraggableSheet extends StatefulWidget {
-  final double _initialChildSize;
-  final double _minChildSize;
-  final double _maxChildSize;
-  final List<CarSides>? _predictedSideList;
-  final bool _pictureButtonActive;
-  final Function() _showImage;
-
-  DraggableSheet(this._initialChildSize, this._minChildSize, this._maxChildSize,
-      this._predictedSideList, this._pictureButtonActive, this._showImage);
-
-  _DraggableSheetState createState() => _DraggableSheetState();
-}
-
-class _DraggableSheetState extends State<DraggableSheet> {
-  @override
-  Widget build(BuildContext context) {
-    setState(() {});
-    print(
-        "initial: ${widget._initialChildSize}, min: ${widget._minChildSize}, max: ${widget._maxChildSize}");
-    return new DraggableScrollableSheet(
-      initialChildSize: widget._initialChildSize,
-      minChildSize: widget._minChildSize,
-      maxChildSize: widget._maxChildSize,
-      builder: (BuildContext context, ScrollController scrollController) {
-        return Container(
-          color: Colors.white,
-          child: ListView.separated(
-            scrollDirection: Axis.vertical,
-            shrinkWrap: true,
-            controller: scrollController,
-            itemCount: widget._predictedSideList == null
-                ? 1
-                : widget._predictedSideList!.length + 1,
-            itemBuilder: (BuildContext context, int index) {
-              final textStyle = TextStyle(fontSize: 20);
-              if (index == 0) {
-                return Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20),
-                  child: TextButton(
-                    style: TextButton.styleFrom(
-                      textStyle: textStyle,
-                    ),
-                    onPressed:
-                        widget._pictureButtonActive ? widget._showImage : null,
-                    child: const Text('Show picture'),
-                  ),
-                );
-              }
-              return Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  children: [
-                    Text(
-                      capitalize(widget._predictedSideList![index - 1].label),
-                      style: textStyle,
-                    ),
-                    Spacer(),
-                    Text(
-                      widget._predictedSideList![index - 1]
-                          .confidenceToPercent(),
-                      style: textStyle,
-                    ),
-                  ],
-                ),
-              );
-            },
-            separatorBuilder: (BuildContext context, int index) =>
-                const Divider(),
-          ),
-        );
-      },
-    );
-  }
-}
+// class TabNavigator extends StatelessWidget {
+//   final GlobalKey<NavigatorState> navigatorKey;
+//   final String tabItem;
+//
+//   const TabNavigator(
+//       {Key? key, required this.navigatorKey, required this.tabItem})
+//       : super(key: key);
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     late Widget child;
+//
+//     if (tabItem == "Page1") child = TakePictureScreen();
+//     if (tabItem == "Page2") child = Page2();
+//     return Navigator(key: navigatorKey, onGenerateRoute: (routeSettings) {
+//       return MaterialPageRoute(builder: (context) => child);
+//     },);
+//   }
+// }
 
 class TakePictureScreen extends StatefulWidget {
   final CameraDescription camera;
@@ -425,17 +298,39 @@ class TakePictureScreenState extends State<TakePictureScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<void>(
-      future: widget.cameraInterface.initializeControllerFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.done) {
-          // If the Future is complete, display the preview.
-          return CameraPreview(widget.cameraInterface.controller);
-        } else {
-          // Otherwise, display a loading indicator.
-          return const Center(child: CircularProgressIndicator());
-        }
-      },
+    final width = MediaQuery
+        .of(context)
+        .size
+        .width;
+    final height = MediaQuery
+        .of(context)
+        .size
+        .height;
+    print("Device Width: $width, Height: $height");
+
+    return Stack(
+      children: [
+        FutureBuilder<void>(
+          future: widget.cameraInterface.initializeControllerFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.done) {
+              // If the Future is complete, display the preview.
+              return CameraPreview(widget.cameraInterface.controller);
+            } else {
+              // Otherwise, display a loading indicator.
+              return const Center(child: CircularProgressIndicator());
+            }
+          },
+        ),
+        Container(
+          width: width,
+          height: width,
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.greenAccent, width: 4),
+          ),
+        ),
+      ]
+      ,
     );
   }
 }
@@ -458,8 +353,8 @@ class SingleNotifier extends ChangeNotifier {
 }
 
 //Dialogue to ask for the real side
-Future<CarSides> _showSingleChoiceDialog(
-    BuildContext context, SingleNotifier _singleNotifier) {
+Future<CarSides> _showSingleChoiceDialog(BuildContext context,
+    SingleNotifier _singleNotifier) {
   final completer = new Completer<CarSides>();
   showDialog(
       context: context,
@@ -476,7 +371,8 @@ Future<CarSides> _showSingleChoiceDialog(
                   mainAxisSize: MainAxisSize.min,
                   children: CarSides.sides
                       .map(
-                        (e) => RadioListTile(
+                        (e) =>
+                        RadioListTile(
                           title: Text(capitalize(e)),
                           value: e,
                           groupValue: _singleNotifier.currentSide,
@@ -484,12 +380,13 @@ Future<CarSides> _showSingleChoiceDialog(
                           onChanged: (value) {
                             if (value != _singleNotifier.currentSide) {
                               print(
-                                  "onChange: from ${_singleNotifier.currentSide} to $value");
+                                  "onChange: from ${_singleNotifier
+                                      .currentSide} to $value");
                               _singleNotifier.updateSide(value);
                             }
                           },
                         ),
-                      )
+                  )
                       .toList(),
                 ),
               ),
@@ -514,12 +411,11 @@ class DisplayPictureScreen extends StatelessWidget {
   final String title;
   final String? text;
 
-  const DisplayPictureScreen(
-    this.image,
-    this.title, {
-    this.text,
-    Key? key,
-  }) : super(key: key);
+  const DisplayPictureScreen(this.image,
+      this.title, {
+        this.text,
+        Key? key,
+      }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -550,9 +446,9 @@ class DisplayPictureScreen extends StatelessWidget {
                 ),
                 child: text != null
                     ? Text(
-                        text!,
-                        // style: TextStyle(color: Colors.white),
-                      )
+                  text!,
+                  // style: TextStyle(color: Colors.white),
+                )
                     : null),
           ],
         ),
