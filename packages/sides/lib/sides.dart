@@ -29,7 +29,7 @@ class CarSides {
   }
 
   String toString() {
-    return capitalize(label) + ' ' + confidence.toStringAsFixed(3);
+    return capitalize(label) + ' ' + confidenceToPercent();
   }
 
   String confidenceToPercent() {
