@@ -118,11 +118,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   late CarSides _realSide;
 
   bool _pictureButtonActive = false;
-
-  late DraggableSheet _draggableScrollableWidget;
-  double _initialChildSize = 0.5;
-  double _minChildSize = 0.1;
-  double _maxChildSize = 0.5;
+  double bottomSheetHeight = 68;
 
   late TakePictureScreen _pictureScreen = new TakePictureScreen(widget.camera);
   final SingleNotifier _singleNotifier = new SingleNotifier();
@@ -158,6 +154,54 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     super.dispose();
   }
 
+  Widget createText() {
+    final textStyle = TextStyle(fontSize: 20);
+    List<Widget> textList = [];
+    textList.add(Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
+      children: [
+        TextButton(
+          style: TextButton.styleFrom(
+            textStyle: TextStyle(fontSize: 20),
+            padding: EdgeInsets.symmetric(vertical: 10),
+          ),
+          onPressed: _pictureButtonActive ? showImage : null,
+          child: const Text('Show picture'),
+        ),
+        Spacer(),
+        TextButton(
+          style: TextButton.styleFrom(
+            textStyle: TextStyle(fontSize: 20),
+            padding: EdgeInsets.symmetric(vertical: 10),
+          ),
+          onPressed: getImage,
+          child: const Text('Take picture'),
+        )
+      ],
+    ));
+    if (_predictedSideList != null)
+      _predictedSideList!.forEach((element) {
+        textList.add(Divider());
+        textList.add(Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            Text(
+              capitalize(element.label),
+              style: textStyle,
+            ),
+            Spacer(),
+            Text(
+              element.confidenceToPercent(),
+              style: textStyle,
+            ),
+          ],
+        ));
+      });
+    return Padding(
+        padding: EdgeInsets.symmetric(horizontal: 30),
+        child: Column(children: textList));
+  }
+
 //Take a picture
   Future getImage() async {
     await _pictureScreen.cameraInterface.initializeControllerFuture;
@@ -183,12 +227,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     print("realSide: $_realSide");
     print("predictedSide: $_predictedSide");
 
-    _initialChildSize = _predictedSideList!.length * 0.1 + 0.1;
-    _minChildSize = 0.3;
-    _maxChildSize = _predictedSideList!.length * 0.1 + 0.1;
-    print("_maxChildSize: $_maxChildSize");
     setState(() {
-      // _maxChildSize = _predictedSideList!.length * 0.1;
+      bottomSheetHeight = _predictedSideList!.length * 39 + 68;
     });
     uploadImage(_croppedImage.file, _predictedSide, _realSide);
     save(_croppedImage.file, _predictedSide,
@@ -214,16 +254,25 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               border: Border.all(color: Colors.greenAccent, width: 4),
             ),
           ),
-          DraggableSheet(_initialChildSize, _minChildSize, _maxChildSize,
-              _predictedSideList, _pictureButtonActive, showImage),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              width: width,
+              height: bottomSheetHeight,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
+                boxShadow: [
+                  BoxShadow(color: Colors.white),
+                ],
+              ),
+              child: createText(),
+            ),
+          ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: getImage,
-        tooltip: 'Pick Image',
-        child: Icon(Icons.add_a_photo),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.miniEndFloat,
     );
   }
 
@@ -254,23 +303,19 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 }
 
-class ColumnBuilder extends StatelessWidget {
-  final IndexedWidgetBuilder itemBuilder;
-  final int itemCount;
+createTexttextfields(int d) {
+  var textEditingControllers = <TextEditingController>[];
 
-  const ColumnBuilder({
-    Key? key,
-    required this.itemBuilder,
-    required this.itemCount,
-  }) : super(key: key);
+  var textFields = <TextField>[];
+  var list = new List<int>.generate(d, (i) => i + 1);
+  print(list);
 
-  @override
-  Widget build(BuildContext context) {
-    return new Column(
-      children: new List.generate(
-          this.itemCount, (index) => this.itemBuilder(context, index)).toList(),
-    );
-  }
+  list.forEach((i) {
+    var textEditingController = new TextEditingController(text: "test $i");
+    textEditingControllers.add(textEditingController);
+    return textFields.add(new TextField(controller: textEditingController));
+  });
+  return textFields;
 }
 
 class DraggableSheet extends StatefulWidget {
@@ -299,16 +344,7 @@ class _DraggableSheetState extends State<DraggableSheet> {
       maxChildSize: widget._maxChildSize,
       builder: (BuildContext context, ScrollController scrollController) {
         return Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-            boxShadow: [
-              BoxShadow(color: Colors.white),
-            ],
-          ),
+          color: Colors.white,
           child: ListView.separated(
             scrollDirection: Axis.vertical,
             shrinkWrap: true,
