@@ -145,7 +145,7 @@ class _MyHomePageState extends State<MyHomePage> {
   late Future<void> _initializeControllerFuture;
 
   @override
-  void initState() {
+  void initState()  {
     super.initState();
     // To display the current output from the Camera,
     // create a CameraController.
@@ -178,7 +178,10 @@ class _MyHomePageState extends State<MyHomePage> {
     var uploaded = false;
     uploaded = await uploadImage(
         _image, res, realSide); //TODO: Finish upload function in sides.dart
-    await save(_image, res, realSide); //Saves image with correct naming
+    if(uploaded == false) {
+      await save(_image, res, realSide); //Saves image with correct naming
+    }
+    await backup();
 
     // setState(() {
     //   if (pickedFile != null) {
