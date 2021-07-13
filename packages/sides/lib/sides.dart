@@ -37,6 +37,29 @@ class CarSides {
   }
 }
 
+backup() async
+{
+  print("Backing Up");
+  var dir = await getExternalStorageDirectory();
+  if(dir!=null) {
+    print(dir);
+    dir.list(recursive: false).forEach((f) async {
+      print(f);
+      var pred = '${f.path.split("/")[f.path.split("/").length-1][0]}'.toUpperCase();
+      var real = '${f.path.split("/")[f.path.split("/").length-1][1]}'.toUpperCase();
+      File fi = File(f.path);
+      var uploaded = false;
+      uploaded = await uploadImage(
+          fi, new CarSides(pred), new CarSides(real));
+      if(uploaded ==  true) {
+        print("Uploaded, deleted");
+        await fi.delete();
+      }
+
+    });
+  }
+}
+
 Future<List<CarSides>> predict(
     File image) async //Predicts the image using the pretrained model
     {
