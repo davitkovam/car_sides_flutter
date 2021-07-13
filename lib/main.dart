@@ -16,25 +16,80 @@ class CameraInterface {
   late Future<void> initializeControllerFuture;
   late bool cameraStarted = false;
 
+  static late final List<CameraDescription> cameras;
+
+  static camerasInitialize() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    cameras = await availableCameras();
+  }
+
   controllerInitialize(camera) {
     cameraStarted = true;
     controller = CameraController(
-        // Get a specific camera from the list of available cameras.
-        camera,
-        // Define the resolution to use.
-        ResolutionPreset.medium,
-        enableAudio: false);
-
-    // Next, initialize the controller. This returns a Future.
+      camera,
+      ResolutionPreset.veryHigh,
+      enableAudio: false,
+      imageFormatGroup: ImageFormatGroup.yuv420,
+    );
     initializeControllerFuture = controller.initialize();
   }
 }
+
+class Img {
+  File? file;
+  ui.Image? uiImage;
+  String? size;
+  late Future _doneFuture;
+
+  String? path;
+  int? _originX;
+  int? _originY;
+  int? _cropWidth;
+  int? _cropHeight;
+
+  Img({this.path, this.file}) {
+    if (path != null) {
+      this.file = File(path!);
+    }
+    _doneFuture = init();
+  }
+
+  Img.fromCrop(this.path, this._originX, this._originY, this._cropWidth,
+      this._cropHeight) {
+    _doneFuture = init(crop: true);
+  }
+
+  Future init({crop = false}) async {
+    if (crop) {
+      await FlutterNativeImage.cropImage(
+              path!, _originX!, _originY!, _cropWidth!, _cropHeight!)
+          .then((value) => file = value);
+    }
+    await decodeImageFromList(file!.readAsBytesSync()).then((value) {
+      this.uiImage = value;
+    });
+    await getFileSize(file!, 2).then((value) => this.size = value);
+  }
+
+  int get width => uiImage!.width;
+
+  int get height => uiImage!.height;
+
+  String get resolution => "$width" + "x" + "$height";
+
+  String toString() {
+    return resolution + " " + size!;
+  }
+
+  Future get initializationDone => _doneFuture;
+}
+
 //All functions are in sides.dart -> packages/sides/lib/sides.dart
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  final cameras = await availableCameras();
+  await CameraInterface.camerasInitialize();
   await CarSides.loadAsset();
+
   runApp(
     MultiProvider(
       providers: [
@@ -42,16 +97,16 @@ Future<void> main() async {
           create: (_) => SingleNotifier(),
         ),
       ],
-      child: MyApp(cameras.first),
+      child: MyApp(),
     ),
   );
 }
 
 class MyApp extends StatelessWidget {
   // This widget is the root of your application.
-  final CameraDescription camera;
+  // final CameraDescription camera;
 
-  MyApp(this.camera, {Key? key}) : super(key: key);
+  MyApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -68,7 +123,7 @@ class MyApp extends StatelessWidget {
         // is not restarted.
         primarySwatch: Colors.orange,
       ),
-      home: MyHomePage('TF Car Sides', camera),
+      home: MyHomePage('TF Car Sides'),
     );
   }
 }
@@ -83,42 +138,25 @@ class MyHomePage extends StatefulWidget {
   // used by the build method of the State. Fields in a Widget subclass are
   // always marked "final".
   final String title;
-  final CameraDescription camera;
 
-  MyHomePage(this.title, this.camera, {Key? key}) : super(key: key);
+  // final CameraDescription camera;
+
+  MyHomePage(this.title, {Key? key}) : super(key: key);
 
   @override
   _MyHomePageState createState() => _MyHomePageState();
 }
 
-class Img {
-  final File file;
-  ui.Image? uiImage;
-  String? size;
-
-  int get width => uiImage!.width;
-
-  int get height => uiImage!.height;
-
-  String get resolution => "$width" + "x" + "$height";
-
-  String toString() {
-    return resolution + " " + size!;
-  }
-
-  Img(this.file, [this.uiImage, this.size]);
-}
-
 class _MyHomePageState extends State<MyHomePage> {
-  late File _imageFile;
+  late Img _imageFile;
   Img? _croppedImage;
 
   List<CarSides>? _predictedSideList;
   late CarSides _predictedSide;
   late CarSides _realSide;
 
-  late TakePictureScreen _pictureScreen = new TakePictureScreen(widget.camera);
-  final SingleNotifier _singleNotifier = new SingleNotifier();
+  late TakePictureScreen _pictureScreen =
+      new TakePictureScreen(CameraInterface.cameras.first);
 
   int _selectedIndex = 0;
   PageController pageController = PageController(
@@ -128,36 +166,34 @@ class _MyHomePageState extends State<MyHomePage> {
 
 //Take a picture
   Future getImage() async {
-    print(
-        "resolution ${_pictureScreen.cameraInterface.controller.resolutionPreset}");
     await _pictureScreen.cameraInterface.initializeControllerFuture;
     XFile xImage =
         await _pictureScreen.cameraInterface.controller.takePicture();
-    _imageFile = File(xImage.path);
-    getFileSize(_imageFile, 2).then((value) => print("Picture size: $value"));
+    _imageFile = Img(path: xImage.path);
+    await _imageFile.initializationDone;
+    print("img res: ${_imageFile.resolution}");
+    _croppedImage = Img.fromCrop(
+        _imageFile.file!.path,
+        (_imageFile.uiImage!.height - _imageFile.uiImage!.width) ~/ 2,
+        0,
+        _imageFile.uiImage!.width,
+        _imageFile.uiImage!.width);
+    await _croppedImage!.initializationDone;
 
-    var decodedImage = await decodeImageFromList(_imageFile.readAsBytesSync());
-    print("Picture resolution: ${decodedImage.height}x${decodedImage.width}");
-
-    _croppedImage = Img(await FlutterNativeImage.cropImage(
-        _imageFile.path, (decodedImage.height - decodedImage.width) ~/ 2, 0, decodedImage.width, decodedImage.width));
-    _croppedImage!.uiImage =
-        await decodeImageFromList(_croppedImage!.file.readAsBytesSync());
-    _croppedImage!.size = await getFileSize(_imageFile, 2);
-    _predictedSideList = await predict(_croppedImage!.file);
+    _predictedSideList = await predict(_croppedImage!.file!);
     _predictedSide = _predictedSideList![0];
 
     setState(() {
       _onItemTapped(1);
     });
-    _realSide = await _showSingleChoiceDialog(context, _singleNotifier);
+    _realSide = await _showSingleChoiceDialog(context);
 
     print("realSide: $_realSide");
     print("predictedSide: $_predictedSide");
 
     setState(() {});
-    uploadImage(_croppedImage!.file, _predictedSide, _realSide);
-    save(_croppedImage!.file, _predictedSide,
+    uploadImage(_croppedImage!.file!, _predictedSide, _realSide);
+    save(_croppedImage!.file!, _predictedSide,
         _realSide); //Saves image with correct naming
   }
 
@@ -285,7 +321,6 @@ class TakePictureScreenState extends State<TakePictureScreen>
     final width = MediaQuery.of(context).size.width;
     final height = MediaQuery.of(context).size.height;
     print("Device Width: $width, Height: $height");
-
     return Container(
       color: Colors.black,
       child: Stack(
@@ -295,8 +330,10 @@ class TakePictureScreenState extends State<TakePictureScreen>
             future: widget.cameraInterface.initializeControllerFuture,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.done) {
-                // If the Future is complete, display the preview.
-                return CameraPreview(widget.cameraInterface.controller);
+                return Container(
+                    width: double.infinity,
+                    height: double.infinity,
+                    child: CameraPreview(widget.cameraInterface.controller));
               } else {
                 // Otherwise, display a loading indicator.
                 return const Center(child: CircularProgressIndicator());
@@ -334,8 +371,8 @@ class SingleNotifier extends ChangeNotifier {
 }
 
 //Dialogue to ask for the real side
-Future<CarSides> _showSingleChoiceDialog(
-    BuildContext context, SingleNotifier _singleNotifier) {
+Future<CarSides> _showSingleChoiceDialog(BuildContext context) {
+  SingleNotifier _singleNotifier;
   final completer = new Completer<CarSides>();
   showDialog(
       context: context,
@@ -396,44 +433,84 @@ class DisplayPictureScreen extends StatelessWidget {
   }) : super(key: key);
 
   List<Widget> description() {
+    final TextStyle textStyle =
+        TextStyle(color: Colors.white70, fontWeight: FontWeight.bold);
     List<Widget> widgetList = [];
-    widgetList.add(Text(image.toString()));
-    carSidesList!
-        .forEach((element) => widgetList.add(Text(element.toString())));
+    widgetList.add(Row(
+      // mainAxisAlignment: MainAxisAlignment.spaceAround,
+      children: [
+        Text(
+          image!.size!,
+          style: textStyle,
+        ),
+        Spacer(),
+        Text(
+          image!.resolution,
+          style: textStyle,
+        )
+      ],
+    ));
+    carSidesList!.forEach((element) => widgetList.add(Row(
+          // mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            Text(
+              capitalize(element.label),
+              style: textStyle,
+            ),
+            Spacer(),
+            Text(
+              element.confidenceToPercent(),
+              style: textStyle,
+            )
+          ],
+        )));
     return widgetList;
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
       height: double.infinity,
       color: Colors.black,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          if (image != null)
-            Image.file(
-              image!.file,
-              // fit: BoxFit.fitWidth,
-              // width: double.infinity,
-              alignment: Alignment.center,
+      child: image == null
+          ? Icon(
+              Icons.image_not_supported,
+              color: Colors.white,
+              size: 100,
+            )
+          : Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.file(
+                  image!.file!,
+                  fit: BoxFit.fitWidth,
+                  width: double.infinity,
+                  // alignment: Alignment.center,
+                ),
+                Align(
+                  alignment: Alignment.bottomLeft,
+                  child: Container(
+                    // alignment: Alignment.bottomLeft,
+                    width: MediaQuery.of(context).size.width / 2,
+                    // height: 100,
+                    padding: EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+                    margin: EdgeInsets.only(top: 10, left: 20),
+                    decoration: BoxDecoration(
+                      // color: Colors.white70,
+                      borderRadius: BorderRadius.all(
+                        Radius.circular(15),
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      // mainAxisSize: MainAxisSize.max,
+                      children: description(),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          Container(
-            padding: EdgeInsets.all(10),
-            margin: EdgeInsets.only(top: 10),
-            decoration: BoxDecoration(
-              color: Colors.white70,
-              borderRadius: BorderRadius.all(
-                Radius.circular(20),
-              ),
-            ),
-            child: Column(
-              children: description(),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
