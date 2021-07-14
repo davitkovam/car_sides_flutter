@@ -1,4 +1,3 @@
-import 'dart:ui' as ui;
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -7,8 +6,8 @@ import 'package:provider/provider.dart';
 import 'package:sides/sides.dart';
 import 'package:camera/camera.dart';
 import 'package:strings/strings.dart';
-import 'package:flutter_native_image/flutter_native_image.dart';
-
+import 'package:image/image.dart' as ImagePackage;
+// import 'package:path_provider/path_provider.dart';
 //Possible classes
 
 class CameraInterface {
@@ -37,43 +36,43 @@ class CameraInterface {
 
 class Img {
   File? file;
-  ui.Image? uiImage;
+  ImagePackage.Image? image;
   String? size;
   late Future _doneFuture;
 
   String? path;
-  int? _originX;
-  int? _originY;
-  int? _cropWidth;
-  int? _cropHeight;
 
   Img({this.path, this.file}) {
     if (path != null) {
       this.file = File(path!);
     }
+    image = ImagePackage.decodeImage(file!.readAsBytesSync());
     _doneFuture = init();
   }
 
-  Img.fromCrop(this.path, this._originX, this._originY, this._cropWidth,
-      this._cropHeight) {
-    _doneFuture = init(crop: true);
+  setPath(path) => this.path = path;
+
+  crop(int x, int y, int w, int h) async {
+    image = ImagePackage.copyCrop(image!, x, y, w, h);
+    File(path!).writeAsBytesSync(ImagePackage.encodeJpg(image!));
+    file = File(path!);
+    await init();
   }
 
-  Future init({crop = false}) async {
-    if (crop) {
-      await FlutterNativeImage.cropImage(
-              path!, _originX!, _originY!, _cropWidth!, _cropHeight!)
-          .then((value) => file = value);
-    }
-    await decodeImageFromList(file!.readAsBytesSync()).then((value) {
-      this.uiImage = value;
-    });
+  resize(width, height) async
+  {
+    image = ImagePackage.copyResize(image!, width: width, height: height);
+    File(path!).writeAsBytesSync(ImagePackage.encodeJpg(image!));
+    file = File(path!);
+    await init();
+  }
+  Future init() async {
     await getFileSize(file!, 2).then((value) => this.size = value);
   }
 
-  int get width => uiImage!.width;
+  int get width => image!.width;
 
-  int get height => uiImage!.height;
+  int get height => image!.height;
 
   String get resolution => "$width" + "x" + "$height";
 
@@ -148,9 +147,8 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  late Img _imageFile;
-  Img? _croppedImage;
-
+  Img? _imageFile;
+  // Img? _croppedImage;
   List<CarSides>? _predictedSideList;
   late CarSides _predictedSide;
   late CarSides _realSide;
@@ -170,17 +168,17 @@ class _MyHomePageState extends State<MyHomePage> {
     XFile xImage =
         await _pictureScreen.cameraInterface.controller.takePicture();
     _imageFile = Img(path: xImage.path);
-    await _imageFile.initializationDone;
-    print("img res: ${_imageFile.resolution}");
-    _croppedImage = Img.fromCrop(
-        _imageFile.file!.path,
-        (_imageFile.uiImage!.height - _imageFile.uiImage!.width) ~/ 2,
-        0,
-        _imageFile.uiImage!.width,
-        _imageFile.uiImage!.width);
-    await _croppedImage!.initializationDone;
+    await _imageFile!.initializationDone;
+    print("x path ${xImage.path}");
+    // var cacheDir = await getTemporaryDirectory();
+    // _croppedImage = _imageFile;
+    // _croppedImage!.setPath('${cacheDir.path}/thumbnail.jpg');
+    await _imageFile!.crop((_imageFile!.width - _imageFile!.height) ~/ 2, 0,
+        _imageFile!.height, _imageFile!.height);
 
-    _predictedSideList = await predict(_croppedImage!.file!);
+    await _imageFile!.resize(240, 240);
+
+    _predictedSideList = await predict(_imageFile!.file!);
     _predictedSide = _predictedSideList![0];
 
     setState(() {
@@ -193,12 +191,13 @@ class _MyHomePageState extends State<MyHomePage> {
 
     setState(() {});
     var uploaded = false;
-    uploaded = await uploadImage(
-        _croppedImage!.file!, _predictedSide, _realSide); //TODO: Finish upload function in sides.dart
-    if(uploaded == false) {
-      await save(_croppedImage!.file!, _predictedSide, _realSide); //Saves image with correct naming
+    uploaded = await uploadImage(_imageFile!.file!, _predictedSide,
+        _realSide); //TODO: Finish upload function in sides.dart
+    if (uploaded == false) {
+      await save(_imageFile!.file!, _predictedSide,
+          _realSide); //Saves image with correct naming
     }
-    await   backup();
+    await backup();
   }
 
   @override
@@ -207,7 +206,8 @@ class _MyHomePageState extends State<MyHomePage> {
       appBar: AppBar(
         title: Text(widget.title),
       ),
-      body: buildPageView(),
+      body: WillPopScope(
+          onWillPop: () => Future.sync(onWillPop), child: buildPageView()),
       bottomNavigationBar: BottomNavigationBar(
         items: buildBottomNavBarItems(),
         currentIndex: _selectedIndex,
@@ -219,13 +219,25 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  bool onWillPop() {
+    if (pageController.page!.round() == pageController.initialPage)
+      return true;
+    else {
+      pageController.previousPage(
+        duration: Duration(milliseconds: 200),
+        curve: Curves.linear,
+      );
+      return false;
+    }
+  }
+
   Widget buildPageView() {
     return PageView(
       controller: pageController,
       onPageChanged: _pageChanged,
       children: <Widget>[
         _pictureScreen,
-        DisplayPictureScreen(_croppedImage, _predictedSideList),
+        DisplayPictureScreen(_imageFile, _predictedSideList),
       ],
     );
   }
@@ -328,18 +340,18 @@ class TakePictureScreenState extends State<TakePictureScreen>
     return Container(
       color: Colors.black,
       child: Stack(
-        alignment: Alignment.center,
+        alignment: FractionalOffset.center,
         children: [
           FutureBuilder<void>(
             future: widget.cameraInterface.initializeControllerFuture,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.done) {
-                return Container(
-                  width: width,
-                  height: height,
-                  child: CameraPreview(
-                          widget.cameraInterface.controller),
-                );
+                return Positioned.fill(
+                    child: AspectRatio(
+                        aspectRatio:
+                            widget.cameraInterface.controller.value.aspectRatio,
+                        child:
+                            CameraPreview(widget.cameraInterface.controller)));
               } else {
                 // Otherwise, display a loading indicator.
                 return const Center(child: CircularProgressIndicator());
@@ -473,6 +485,14 @@ class DisplayPictureScreen extends StatelessWidget {
     return widgetList;
   }
 
+  // void resizedImage()
+  // {
+  //   final img1 = ImagePackage.decodeImage(image!.file!.readAsBytesSync());
+  //   final img3 = ImagePackage.copyCrop();
+  //   final img2 = ImagePackage.copyResize(img1!, width: 240, height: 240);
+  //   File('thumbnail.png').writeAsBytesSync(ImagePackage.encodePng(img2));
+  //
+  // }
   @override
   Widget build(BuildContext context) {
     return Container(
