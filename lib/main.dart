@@ -156,9 +156,15 @@ class _MyHomePageState extends State<MyHomePage> {
     print("predictedSide: $_predictedSide");
 
     setState(() {});
-    uploadImage(_croppedImage!.file, _predictedSide, _realSide);
-    save(_croppedImage!.file, _predictedSide,
-        _realSide); //Saves image with correct naming
+
+    var uploaded = false;
+    uploaded = await uploadImage(
+        _croppedImage!.file, _predictedSide, _realSide); //TODO: Finish upload function in sides.dart
+    if(uploaded == false) {
+      await save(_croppedImage!.file, _predictedSide, _realSide); //Saves image with correct naming
+    }
+    await   backup();
+
   }
 
   @override
