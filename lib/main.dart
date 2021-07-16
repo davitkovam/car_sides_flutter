@@ -7,6 +7,7 @@ import 'package:sides/sides.dart';
 import 'package:camera/camera.dart';
 import 'package:strings/strings.dart';
 import 'package:image/image.dart' as ImagePackage;
+
 // import 'package:path_provider/path_provider.dart';
 //Possible classes
 
@@ -22,11 +23,11 @@ class CameraInterface {
     cameras = await availableCameras();
   }
 
-  controllerInitialize(camera) {
+  controllerInitialize(camera, ResolutionPreset res) {
     cameraStarted = true;
     controller = CameraController(
       camera,
-      ResolutionPreset.veryHigh,
+      res,
       enableAudio: false,
       imageFormatGroup: ImageFormatGroup.yuv420,
     );
@@ -59,13 +60,13 @@ class Img {
     await init();
   }
 
-  resize(width, height) async
-  {
+  resize(width, height) async {
     image = ImagePackage.copyResize(image!, width: width, height: height);
     File(path!).writeAsBytesSync(ImagePackage.encodeJpg(image!));
     file = File(path!);
     await init();
   }
+
   Future init() async {
     await getFileSize(file!, 2).then((value) => this.size = value);
   }
@@ -148,6 +149,7 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   Img? _imageFile;
+
   // Img? _croppedImage;
   List<CarSides>? _predictedSideList;
   late CarSides _predictedSide;
@@ -234,6 +236,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget buildPageView() {
     return PageView(
       controller: pageController,
+      physics: NeverScrollableScrollPhysics(),
       onPageChanged: _pageChanged,
       children: <Widget>[
         _pictureScreen,
@@ -284,11 +287,10 @@ class TakePictureScreen extends StatefulWidget {
   final CameraDescription? camera;
   final CameraInterface cameraInterface = new CameraInterface();
 
-  TakePictureScreen(this.camera, {Key? key}) : super(key: key) {
-    // controllerInitialize();
-  }
+  TakePictureScreen(this.camera, {Key? key}) : super(key: key);
 
-  controllerInitialize() => cameraInterface.controllerInitialize(camera);
+  controllerInitialize(ResolutionPreset res) =>
+      cameraInterface.controllerInitialize(camera, res);
 
   @override
   TakePictureScreenState createState() => TakePictureScreenState();
@@ -296,13 +298,15 @@ class TakePictureScreen extends StatefulWidget {
 
 class TakePictureScreenState extends State<TakePictureScreen>
     with WidgetsBindingObserver {
+  ResolutionPreset resolution = ResolutionPreset.max;
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     print("state: $state");
     print("cameraStarted: ${widget.cameraInterface.cameraStarted}");
     if (!widget.cameraInterface.cameraStarted &&
         state == AppLifecycleState.resumed) {
-      widget.controllerInitialize();
+      widget.controllerInitialize(resolution);
       print("Initialize camera");
       widget.cameraInterface.cameraStarted = true;
       widget.cameraInterface.initializeControllerFuture
@@ -316,18 +320,19 @@ class TakePictureScreenState extends State<TakePictureScreen>
 
   @override
   void initState() {
+    print("cam init");
     super.initState();
     // To display the current output from the Camera,
     // create a CameraController.
     WidgetsBinding.instance!.addObserver(this);
-    widget.controllerInitialize();
   }
 
   @override
   void dispose() {
+    print("cam dispose");
     // Dispose of the controller when the widget is disposed.
-    widget.cameraInterface.controller.dispose();
-    widget.cameraInterface.cameraStarted = false;
+    // widget.cameraInterface.controller.dispose();
+    // widget.cameraInterface.cameraStarted = false;
     WidgetsBinding.instance!.removeObserver(this);
     super.dispose();
   }
@@ -336,36 +341,37 @@ class TakePictureScreenState extends State<TakePictureScreen>
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     final height = MediaQuery.of(context).size.height;
-    print("Device Width: $width, Height: $height");
+    if (!widget.cameraInterface.cameraStarted) {
+      if (width <= 365 && height < 600)
+        resolution = ResolutionPreset.medium;
+      widget.controllerInitialize(resolution);
+    }
+    print("cam res: $resolution");
     return Container(
       color: Colors.black,
-      child: Stack(
-        alignment: FractionalOffset.center,
-        children: [
-          FutureBuilder<void>(
-            future: widget.cameraInterface.initializeControllerFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.done) {
-                return Positioned.fill(
-                    child: AspectRatio(
-                        aspectRatio:
-                            widget.cameraInterface.controller.value.aspectRatio,
-                        child:
-                            CameraPreview(widget.cameraInterface.controller)));
-              } else {
-                // Otherwise, display a loading indicator.
-                return const Center(child: CircularProgressIndicator());
-              }
-            },
-          ),
-          Container(
-            width: width,
-            height: width,
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.greenAccent, width: 4),
-            ),
-          ),
-        ],
+      child: FutureBuilder<void>(
+        future: widget.cameraInterface.initializeControllerFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.done) {
+            return Stack(alignment: FractionalOffset.center, children: [
+              Positioned.fill(
+                  child: AspectRatio(
+                      aspectRatio:
+                          widget.cameraInterface.controller.value.aspectRatio,
+                      child: CameraPreview(widget.cameraInterface.controller))),
+              Container(
+                width: width,
+                height: width,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.greenAccent, width: 4),
+                ),
+              ),
+            ]);
+          } else {
+            // Otherwise, display a loading indicator.
+            return const Center(child: CircularProgressIndicator());
+          }
+        },
       ),
     );
   }
