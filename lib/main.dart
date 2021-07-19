@@ -7,7 +7,7 @@ import 'package:sides/sides.dart';
 import 'package:camera/camera.dart';
 import 'package:strings/strings.dart';
 import 'package:image/image.dart' as ImagePackage;
-import 'package:flutter_logs/flutter_logs.dart';
+import 'package:f_logs/f_logs.dart';
 
 // import 'package:path_provider/path_provider.dart';
 //Possible classes
@@ -90,23 +90,7 @@ class Img {
 Future<void> main() async {
   await CameraInterface.camerasInitialize();
   await CarSides.loadAsset();
-
-  await FlutterLogs.initLogs(
-      logLevelsEnabled: [
-        LogLevel.INFO,
-        LogLevel.WARNING,
-        LogLevel.ERROR,
-        LogLevel.SEVERE
-      ],
-      timeStampFormat: TimeStampFormat.TIME_FORMAT_READABLE,
-      directoryStructure: DirectoryStructure.FOR_DATE,
-      logTypesEnabled: ["device","network","errors"],
-      logFileExtension: LogFileExtension.LOG,
-      logsWriteDirectoryName: "MyLogs",
-      logsExportDirectoryName: "MyLogs/Exported",
-      debugFileOperations: true,
-      isDebuggable: true);
-
+  // FLog.printLogs();
   runApp(
     MultiProvider(
       providers: [
@@ -186,59 +170,77 @@ class _MyHomePageState extends State<MyHomePage> {
 
 //Take a picture
   Future getImage() async {
-    print("getImage()");
-    FlutterLogs.logInfo("Info", "getImage", "getImage() started");
-    await _pictureScreen.cameraInterface.initializeControllerFuture;
-    XFile xImage =
-        await _pictureScreen.cameraInterface.controller.takePicture();
-    _imageFile = Img(path: xImage.path);
-    await _imageFile!.initializationDone;
-    print("x path ${xImage.path}");
-    FlutterLogs.logInfo("Info", "getImage", "image xPath: ${xImage.path}");
-    // var cacheDir = await getTemporaryDirectory();
-    // _croppedImage = _imageFile;
-    // _croppedImage!.setPath('${cacheDir.path}/thumbnail.jpg');
-    print("pic res: ${_imageFile!.resolution}");
-    FlutterLogs.logInfo("Info", "getImage", "image resolution: ${_imageFile!.resolution}");
+    FLog.info(
+        className: "MyHomePage",
+        methodName: "getImage",
+        text: "getImage() started");
+    try {
 
-    if (_imageFile!.width < _imageFile!.height) {
-      print("height > width");
-      FlutterLogs.logInfo("Info", "getImage", "height > width");
-      await _imageFile!.crop(0, (_imageFile!.height - _imageFile!.width) ~/ 2,
-          _imageFile!.width, _imageFile!.width);
-    } else {
-      print("width >= height");
-      FlutterLogs.logInfo("Info", "getImage", "width > height");
-      await _imageFile!.crop((_imageFile!.width - _imageFile!.height) ~/ 2, 0,
-          _imageFile!.height, _imageFile!.height);
+      await _pictureScreen.cameraInterface.initializeControllerFuture;
+      XFile xImage =
+          await _pictureScreen.cameraInterface.controller.takePicture();
+      _imageFile = Img(path: xImage.path);
+      await _imageFile!.initializationDone;
+      FLog.info(
+          className: "MyHomePage",
+          methodName: "getImage",
+          text: "image xPath: ${xImage.path}");
+      // var cacheDir = await getTemporaryDirectory();
+      // _croppedImage = _imageFile;
+      // _croppedImage!.setPath('${cacheDir.path}/thumbnail.jpg');
+      FLog.info(
+          className: "MyHomePage",
+          methodName: "getImage",
+          text: "image resolution: ${_imageFile!.resolution}");
+
+      if (_imageFile!.width < _imageFile!.height) {
+        FLog.info(
+            className: "MyHomePage",
+            methodName: "getImage",
+            text: "height > width");
+        await _imageFile!.crop(0, (_imageFile!.height - _imageFile!.width) ~/ 2,
+            _imageFile!.width, _imageFile!.width);
+      } else {
+        FLog.info(
+            className: "MyHomePage",
+            methodName: "getImage",
+            text: "width > height");
+        await _imageFile!.crop((_imageFile!.width - _imageFile!.height) ~/ 2, 0,
+            _imageFile!.height, _imageFile!.height);
+      }
+
+      FLog.info(
+          className: "MyHomePage",
+          methodName: "getImage",
+          text: "croppedImage resolution: ${_imageFile!.resolution}");
+
+      await _imageFile!.resize(240, 240);
+
+      _predictedSideList = await predict(_imageFile!.file!);
+      _predictedSide = _predictedSideList![0];
+
+      setState(() {
+        _onItemTapped(1);
+      });
+      _realSide = await _showSingleChoiceDialog(context);
+
+      FLog.info(
+          className: "MyHomePage",
+          methodName: "getImage",
+          text: "realSide: $_realSide, predictedSide: $_predictedSide");
+
+      setState(() {});
+      var uploaded = false;
+      uploaded = await uploadImage(_imageFile!.file!, _predictedSide,
+          _realSide); //TODO: Finish upload function in sides.dart
+      if (uploaded == false) {
+        await save(_imageFile!.file!, _predictedSide,
+            _realSide); //Saves image with correct naming
+      }
+      await backup();
+    } catch (e) {
+      FLog.error(className: "MyHomePage", methodName: "getImage", text: "$e");
     }
-
-    print("crop pic res: ${_imageFile!.resolution}");
-    FlutterLogs.logInfo("Info", "getImage", "croppedImage resolution: ${_imageFile!.resolution}");
-
-    await _imageFile!.resize(240, 240);
-
-    _predictedSideList = await predict(_imageFile!.file!);
-    _predictedSide = _predictedSideList![0];
-
-    setState(() {
-      _onItemTapped(1);
-    });
-    _realSide = await _showSingleChoiceDialog(context);
-
-    print("realSide: $_realSide");
-    print("predictedSide: $_predictedSide");
-    FlutterLogs.logInfo("Info", "getImage", "realSide: $_realSide, predictedSide: $_predictedSide");
-
-    setState(() {});
-    var uploaded = false;
-    uploaded = await uploadImage(_imageFile!.file!, _predictedSide,
-        _realSide); //TODO: Finish upload function in sides.dart
-    if (uploaded == false) {
-      await save(_imageFile!.file!, _predictedSide,
-          _realSide); //Saves image with correct naming
-    }
-    await backup();
   }
 
   @override
@@ -340,21 +342,29 @@ class TakePictureScreenState extends State<TakePictureScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    print("state: $state");
-    FlutterLogs.logInfo("Info", "TakePictureScreenState", "state changed to: $state");
-    print("cameraStarted: ${widget.cameraInterface.cameraStarted}");
-    FlutterLogs.logInfo("Info", "TakePictureScreenState", "cameraStarted: ${widget.cameraInterface.cameraStarted}");
+    FLog.info(
+        className: "TakePictureScreenState",
+        methodName: "AppState",
+        text: "state changed to: $state");
+    FLog.info(
+        className: "TakePictureScreenState",
+        methodName: "AppState",
+        text: "cameraStarted: ${widget.cameraInterface.cameraStarted}");
     if (!widget.cameraInterface.cameraStarted &&
         state == AppLifecycleState.resumed) {
       widget.controllerInitialize(resolution);
-      print("Initialize camera");
-      FlutterLogs.logInfo("Info", "TakePictureScreenState", "Initialize camera");
+      FLog.info(
+          className: "TakePictureScreenState",
+          methodName: "AppState",
+          text: "Initialize camera");
       widget.cameraInterface.cameraStarted = true;
       widget.cameraInterface.initializeControllerFuture
           .then((value) => setState(() {}));
     } else if (widget.cameraInterface.cameraStarted) {
-      print("Dispose camera");
-      FlutterLogs.logInfo("Info", "TakePictureScreenState", "Dispose camera");
+      FLog.info(
+          className: "TakePictureScreenState",
+          methodName: "AppState",
+          text: "Dispose camera");
       widget.cameraInterface.controller.dispose();
       widget.cameraInterface.cameraStarted = false;
     }
@@ -362,7 +372,6 @@ class TakePictureScreenState extends State<TakePictureScreen>
 
   @override
   void initState() {
-    print("cam init");
     super.initState();
     // To display the current output from the Camera,
     // create a CameraController.
@@ -371,7 +380,6 @@ class TakePictureScreenState extends State<TakePictureScreen>
 
   @override
   void dispose() {
-    print("cam dispose");
     // Dispose of the controller when the widget is disposed.
     // widget.cameraInterface.controller.dispose();
     // widget.cameraInterface.cameraStarted = false;
@@ -387,28 +395,39 @@ class TakePictureScreenState extends State<TakePictureScreen>
       if (width <= 365 && height < 600) resolution = ResolutionPreset.medium;
       widget.controllerInitialize(resolution);
     }
-    print("cam res: $resolution");
-    FlutterLogs.logInfo("Info", "CameraPreview", "Camera resolution: $resolution");
+    FLog.info(
+        className: "TakePictureScreenState",
+        methodName: "Build",
+        text: "Camera resolution: $resolution");
     return Container(
       color: Colors.black,
       child: FutureBuilder<void>(
         future: widget.cameraInterface.initializeControllerFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
-            return Stack(alignment: FractionalOffset.center, children: [
-              Positioned.fill(
-                  child: AspectRatio(
-                      aspectRatio:
-                          widget.cameraInterface.controller.value.aspectRatio,
-                      child: CameraPreview(widget.cameraInterface.controller))),
-              Container(
-                width: width,
-                height: width,
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.greenAccent, width: 4),
+            try {
+              return Stack(alignment: FractionalOffset.center, children: [
+                Positioned.fill(
+                    child: AspectRatio(
+                        aspectRatio:
+                            widget.cameraInterface.controller.value.aspectRatio,
+                        child:
+                            CameraPreview(widget.cameraInterface.controller))),
+                Container(
+                  width: width,
+                  height: width,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.greenAccent, width: 4),
+                  ),
                 ),
-              ),
-            ]);
+              ]);
+            } catch (e) {
+              FLog.error(
+                  className: "TakePictureScreenState",
+                  methodName: "Build",
+                  text: "$e");
+              return const Center(child: CircularProgressIndicator());
+            }
           } else {
             // Otherwise, display a loading indicator.
             return const Center(child: CircularProgressIndicator());
@@ -462,8 +481,6 @@ Future<CarSides> _showSingleChoiceDialog(BuildContext context) {
                           selected: _singleNotifier.currentSide == e,
                           onChanged: (value) {
                             if (value != _singleNotifier.currentSide) {
-                              print(
-                                  "onChange: from ${_singleNotifier.currentSide} to $value");
                               _singleNotifier.updateSide(value);
                             }
                           },
