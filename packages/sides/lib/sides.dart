@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:strings/strings.dart';
+import 'package:flutter_logs/flutter_logs.dart';
 
 class CarSides {
   // final List<String> _sides = ['Front', 'Back', 'Left', 'Right', 'Diagonal'];
@@ -49,9 +50,12 @@ class CarSides {
 
 backup() async {
   print("Backing Up");
+  FlutterLogs.logInfo("Info", "Backup", "Backing Up");
+
   var dir = await getExternalStorageDirectory();
   if (dir != null) {
     print("dir: $dir");
+    FlutterLogs.logInfo("Info", "Backup", "Directory: $dir");
     dir.list(recursive: false).forEach((f) async {
       print("f: $f");
       var pred =
@@ -89,7 +93,7 @@ Future<List<CarSides>> predict(
       threshold: 0.1,
       asynch: true);
   print("recognitions: $recognitions");
-
+  FlutterLogs.logInfo("Info", "Predict", "Recognitions: $recognitions");
   List<CarSides> carSidesList = [];
   recognitions!.forEach((element) =>
       carSidesList.add(CarSides(element['label'], element['confidence'])));
@@ -145,13 +149,17 @@ Future<bool> uploadImage(
     request.files.add(multipartFile);
     var response = await request.send();
     print("statusCode: ${response.statusCode}");
+    FlutterLogs.logInfo("Info", "Upload", "statusCode: ${response.statusCode}");
     response.stream.transform(utf8.decoder).listen((value) {
       print("Answer: $value");
+      FlutterLogs.logInfo("Info", "Upload", "Answer: $value");
     });
     print("Image uploaded");
+    FlutterLogs.logInfo("Info", "Upload", "Image uploaded");
     return true;
   }
   print("Upload not successful!");
+  FlutterLogs.logInfo("Info", "Upload", "Upload not successful!");
   return false;
 }
 
