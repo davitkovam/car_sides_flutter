@@ -121,8 +121,11 @@ class MyApp extends StatelessWidget {
         // or simply save your changes to "hot reload" in a Flutter IDE).
         // Notice that the counter didn't reset back to zero; the application
         // is not restarted.
-        primarySwatch: Colors.orange,
+        // primarySwatch: Colors.orange,
+        brightness: Brightness.light,
       ),
+      darkTheme: ThemeData(brightness: Brightness.dark),
+      themeMode: ThemeMode.system,
       home: MyHomePage('TF Car Sides'),
     );
   }
@@ -228,7 +231,6 @@ class _MyHomePageState extends State<MyHomePage> {
       bottomNavigationBar: BottomNavigationBar(
         items: buildBottomNavBarItems(),
         currentIndex: _selectedIndex,
-        selectedItemColor: Colors.amber[800],
         onTap: _onItemTapped,
       ),
       floatingActionButton: _buttonFAB(),
