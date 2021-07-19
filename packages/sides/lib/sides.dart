@@ -20,6 +20,16 @@ class CarSides {
 
   CarSides([this.label = "", this.confidence = 0.0]);
 
+  CarSides.fromLetter(letter) {
+    for (var side in sides) {
+      if (capitalize(side[0]) == letter) {
+        label = side;
+        break;
+      }
+    }
+    confidence = 0.0;
+  }
+
   static loadAsset() async {
     sides = (await rootBundle.loadString('assets/labels.txt')).split("\n");
   }
@@ -37,32 +47,33 @@ class CarSides {
   }
 }
 
-backup() async
-{
+backup() async {
   print("Backing Up");
   var dir = await getExternalStorageDirectory();
-  if(dir!=null) {
-    print(dir);
+  if (dir != null) {
+    print("dir: $dir");
     dir.list(recursive: false).forEach((f) async {
-      print(f);
-      var pred = '${f.path.split("/")[f.path.split("/").length-1][0]}'.toUpperCase();
-      var real = '${f.path.split("/")[f.path.split("/").length-1][1]}'.toUpperCase();
+      print("f: $f");
+      var pred =
+          '${f.path.split("/")[f.path.split("/").length - 1][0]}'.toUpperCase();
+      var real =
+          '${f.path.split("/")[f.path.split("/").length - 1][1]}'.toUpperCase();
+      print("pred: $pred, real: $real");
       File fi = File(f.path);
       var uploaded = false;
       uploaded = await uploadImage(
-          fi, new CarSides(pred), new CarSides(real));
-      if(uploaded ==  true) {
+          fi, new CarSides.fromLetter(pred), new CarSides.fromLetter(real));
+      if (uploaded == true) {
         print("Uploaded, deleted");
         await fi.delete();
       }
-
     });
   }
 }
 
 Future<List<CarSides>> predict(
     File image) async //Predicts the image using the pretrained model
-    {
+{
   await Tflite.loadModel(
       model: "assets/model.tflite",
       labels: "assets/labels.txt",
@@ -102,9 +113,9 @@ Future<bool> internetAvailable() async {
   return false;
 }
 
-Future<bool> uploadImage(File image, CarSides predictedSide,
-    CarSides realSide) async //In progress
-    {
+Future<bool> uploadImage(
+    File image, CarSides predictedSide, CarSides realSide) async //In progress
+{
   if (await internetAvailable()) {
     var now = DateTime.now();
     var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
@@ -146,7 +157,7 @@ Future<bool> uploadImage(File image, CarSides predictedSide,
 
 save(File image, CarSides predictedSide,
     CarSides realSide) async //Saves picture in phone
-    {
+{
   var now = DateTime.now();
   var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
   String currentTimeStamp = formatter.format(now);
