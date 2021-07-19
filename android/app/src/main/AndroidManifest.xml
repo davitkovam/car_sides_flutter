@@ -4,7 +4,7 @@
    <application
 
        android:requestLegacyExternalStorage="true"
-        android:label="flutter_app"
+        android:label="TF Car Sides"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"

@@ -60,7 +60,7 @@ class Img {
     await init();
   }
 
-  resize(width, height) async {
+  resize(int width, int height) async {
     image = ImagePackage.copyResize(image!, width: width, height: height);
     File(path!).writeAsBytesSync(ImagePackage.encodeJpg(image!));
     file = File(path!);
@@ -166,6 +166,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
 //Take a picture
   Future getImage() async {
+    print("getImage()");
     await _pictureScreen.cameraInterface.initializeControllerFuture;
     XFile xImage =
         await _pictureScreen.cameraInterface.controller.takePicture();
@@ -175,8 +176,22 @@ class _MyHomePageState extends State<MyHomePage> {
     // var cacheDir = await getTemporaryDirectory();
     // _croppedImage = _imageFile;
     // _croppedImage!.setPath('${cacheDir.path}/thumbnail.jpg');
-    await _imageFile!.crop((_imageFile!.width - _imageFile!.height) ~/ 2, 0,
-        _imageFile!.height, _imageFile!.height);
+    print("pic res: ${_imageFile!.resolution}");
+
+    if(_imageFile!.width < _imageFile!.height)
+      {
+        print("height > width");
+        await _imageFile!.crop(0, (_imageFile!.height - _imageFile!.width) ~/ 2,
+            _imageFile!.width, _imageFile!.width);
+      }
+    else
+      {
+        print("width >= height");
+        await _imageFile!.crop((_imageFile!.width - _imageFile!.height) ~/ 2, 0,
+            _imageFile!.height, _imageFile!.height);
+      }
+
+    print("crop pic res: ${_imageFile!.resolution}");
 
     await _imageFile!.resize(240, 240);
 
