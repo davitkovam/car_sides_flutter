@@ -164,6 +164,8 @@ class _MyHomePageState extends State<MyHomePage> {
   late TakePictureScreen _pictureScreen =
       new TakePictureScreen(CameraInterface.cameras.first);
 
+  bool getImageStarted = false;
+
   int _selectedIndex = 0;
   PageController pageController = PageController(
     initialPage: 0,
@@ -172,78 +174,85 @@ class _MyHomePageState extends State<MyHomePage> {
 
 //Take a picture
   Future getImage() async {
-    FLog.info(
-        className: "MyHomePage",
-        methodName: "getImage",
-        text: "getImage() started");
-    try {
-      await _pictureScreen.cameraInterface.initializeControllerFuture;
-      // XFile xImage =
-      //     await _pictureScreen.cameraInterface.controller.takePicture();
-      var cacheDir = await getTemporaryDirectory();
-      var path = cacheDir.path + "/thumbnail.jpg";
-      await _pictureScreen.cameraInterface.controller.takePicture(path);
-      _imageFile = Img(path: path);
-      await _imageFile!.initializationDone;
+    if(!getImageStarted) {
+      getImageStarted = true;
       FLog.info(
           className: "MyHomePage",
           methodName: "getImage",
-          text: "image path: $path");
-      // var cacheDir = await getTemporaryDirectory();
-      // _croppedImage = _imageFile;
-      // _croppedImage!.setPath('${cacheDir.path}/thumbnail.jpg');
-      FLog.info(
-          className: "MyHomePage",
-          methodName: "getImage",
-          text: "image resolution: ${_imageFile!.resolution}");
-
-      if (_imageFile!.width < _imageFile!.height) {
+          text: "getImage() started");
+      try {
+        await _pictureScreen.cameraInterface.initializeControllerFuture;
+        // XFile xImage =
+        //     await _pictureScreen.cameraInterface.controller.takePicture();
+        var cacheDir = await getTemporaryDirectory();
+        var path = cacheDir.path + "/thumbnail.jpg";
+        await _pictureScreen.cameraInterface.controller.takePicture(path);
+        _imageFile = Img(path: path);
+        await _imageFile!.initializationDone;
         FLog.info(
             className: "MyHomePage",
             methodName: "getImage",
-            text: "height > width");
-        await _imageFile!.crop(0, (_imageFile!.height - _imageFile!.width) ~/ 2,
-            _imageFile!.width, _imageFile!.width);
-      } else {
+            text: "image path: $path");
+        // var cacheDir = await getTemporaryDirectory();
+        // _croppedImage = _imageFile;
+        // _croppedImage!.setPath('${cacheDir.path}/thumbnail.jpg');
         FLog.info(
             className: "MyHomePage",
             methodName: "getImage",
-            text: "width > height");
-        await _imageFile!.crop((_imageFile!.width - _imageFile!.height) ~/ 2, 0,
-            _imageFile!.height, _imageFile!.height);
+            text: "image resolution: ${_imageFile!.resolution}");
+
+        if (_imageFile!.width < _imageFile!.height) {
+          FLog.info(
+              className: "MyHomePage",
+              methodName: "getImage",
+              text: "height > width");
+          await _imageFile!.crop(
+              0,
+              (_imageFile!.height - _imageFile!.width) ~/ 2,
+              _imageFile!.width,
+              _imageFile!.width);
+        } else {
+          FLog.info(
+              className: "MyHomePage",
+              methodName: "getImage",
+              text: "width > height");
+          await _imageFile!.crop((_imageFile!.width - _imageFile!.height) ~/ 2,
+              0, _imageFile!.height, _imageFile!.height);
+        }
+
+        FLog.info(
+            className: "MyHomePage",
+            methodName: "getImage",
+            text: "croppedImage resolution: ${_imageFile!.resolution}");
+
+        await _imageFile!.resize(240, 240);
+
+        _predictedSideList = await predict(_imageFile!.file!);
+        _predictedSide = _predictedSideList![0];
+
+        setState(() {
+          _onItemTapped(1);
+        });
+        _realSide = await _showSingleChoiceDialog(context);
+
+        FLog.info(
+            className: "MyHomePage",
+            methodName: "getImage",
+            text: "realSide: $_realSide, predictedSide: $_predictedSide");
+
+        setState(() {});
+        var uploaded = false;
+        uploaded = await uploadImage(_imageFile!.file!, _predictedSide,
+            _realSide); //TODO: Finish upload function in sides.dart
+        if (uploaded == false) {
+          await save(_imageFile!.file!, _predictedSide,
+              _realSide); //Saves image with correct naming
+        }
+        await backup();
+        getImageStarted = false;
+      } catch (e) {
+        FLog.error(className: "MyHomePage", methodName: "getImage", text: "$e");
       }
-
-      FLog.info(
-          className: "MyHomePage",
-          methodName: "getImage",
-          text: "croppedImage resolution: ${_imageFile!.resolution}");
-
-      await _imageFile!.resize(240, 240);
-
-      _predictedSideList = await predict(_imageFile!.file!);
-      _predictedSide = _predictedSideList![0];
-
-      setState(() {
-        _onItemTapped(1);
-      });
-      _realSide = await _showSingleChoiceDialog(context);
-
-      FLog.info(
-          className: "MyHomePage",
-          methodName: "getImage",
-          text: "realSide: $_realSide, predictedSide: $_predictedSide");
-
-      setState(() {});
-      var uploaded = false;
-      uploaded = await uploadImage(_imageFile!.file!, _predictedSide,
-          _realSide); //TODO: Finish upload function in sides.dart
-      if (uploaded == false) {
-        await save(_imageFile!.file!, _predictedSide,
-            _realSide); //Saves image with correct naming
-      }
-      await backup();
-    } catch (e) {
-      FLog.error(className: "MyHomePage", methodName: "getImage", text: "$e");
     }
   }
 
