@@ -36,7 +36,7 @@ class CarSides {
   }
 
   firstLetter() {
-    return label[0].toUpperCase();
+    return capitalize(label[0]);
   }
 
   String toString() {
@@ -52,21 +52,31 @@ backup() async {
   FLog.info(className: "Sides", methodName: "Backup", text: "Backing Up");
   var dir = await getExternalStorageDirectory();
   if (dir != null) {
-    FLog.info(className: "Sides", methodName: "Backup", text: "Directory: $dir");
+    FLog.info(
+        className: "Sides", methodName: "Backup", text: "Directory: $dir");
     dir.list(recursive: false).forEach((f) async {
-      FLog.info(className: "Sides", methodName: "Backup", text: "f: $f");
-      var pred =
-          '${f.path.split("/")[f.path.split("/").length - 1][0]}'.toUpperCase();
-      var real =
-          '${f.path.split("/")[f.path.split("/").length - 1][1]}'.toUpperCase();
-      FLog.info(className: "Sides", methodName: "Backup", text: "pred: $pred, real: $real");
-      File fi = File(f.path);
-      var uploaded = false;
-      uploaded = await uploadImage(
-          fi, new CarSides.fromLetter(pred), new CarSides.fromLetter(real));
-      if (uploaded == true) {
-        FLog.info(className: "Sides", methodName: "Backup", text: "Uploaded, deleted");
-        await fi.delete();
+      if (f.path.contains(".jpg"))
+      {
+        FLog.info(className: "Sides", methodName: "Backup", text: "f: $f");
+        var pred = '${f.path.split("/")[f.path.split("/").length - 1][0]}'
+            .toUpperCase();
+        var real = '${f.path.split("/")[f.path.split("/").length - 1][1]}'
+            .toUpperCase();
+        FLog.info(
+            className: "Sides",
+            methodName: "Backup",
+            text: "pred: $pred, real: $real");
+        File fi = File(f.path);
+        var uploaded = false;
+        uploaded = await uploadImage(
+            fi, new CarSides.fromLetter(pred), new CarSides.fromLetter(real));
+        if (uploaded == true) {
+          FLog.info(
+              className: "Sides",
+              methodName: "Backup",
+              text: "Uploaded, deleted");
+          await fi.delete();
+        }
       }
     });
   }
@@ -89,7 +99,10 @@ Future<List<CarSides>> predict(
       numResults: 5,
       threshold: 0.1,
       asynch: true);
-  FLog.info(className: "Sides", methodName: "Predict", text: "Recognitions: $recognitions");
+  FLog.info(
+      className: "Sides",
+      methodName: "Predict",
+      text: "Recognitions: $recognitions");
   List<CarSides> carSidesList = [];
   recognitions!.forEach((element) =>
       carSidesList.add(CarSides(element['label'], element['confidence'])));
@@ -107,7 +120,10 @@ Future<bool> internetAvailable() async {
       return true;
     }
   } on SocketException catch (_) {
-    FLog.info(className: "Sides", methodName: "internetAvailable", text: "not connected");
+    FLog.info(
+        className: "Sides",
+        methodName: "internetAvailable",
+        text: "not connected");
     return false;
   }
   return false;
@@ -122,13 +138,15 @@ Future<bool> uploadImage(
     String currentTimeStamp = formatter.format(now);
 
     //XY_Cars -> X = predicted, Y=real
-    var X = predictedSide.firstLetter();
-    var Y = realSide.firstLetter();
+    String X = predictedSide.firstLetter();
+    String Y = realSide.firstLetter();
 
-    String fileName =
-        X.toString() + Y.toString() + "_" + "Cars" + currentTimeStamp + ".jpg";
-
-    FLog.info(className: "Sides", methodName: "uploadImage", text: "Internet Available");
+    String fileName = X + Y + "_" + "Cars" + currentTimeStamp + ".jpg";
+    // print(fileName);
+    FLog.info(
+        className: "Sides",
+        methodName: "uploadImage",
+        text: "Internet Available");
     var stream = new http.ByteStream(image.openRead());
     stream.cast();
     var length = await image.length();
@@ -144,14 +162,24 @@ Future<bool> uploadImage(
 
     request.files.add(multipartFile);
     var response = await request.send();
-    FLog.info(className: "Sides", methodName: "uploadImage", text: "statusCode: ${response.statusCode}");
+    FLog.info(
+        className: "Sides",
+        methodName: "uploadImage",
+        text: "statusCode: ${response.statusCode}");
     response.stream.transform(utf8.decoder).listen((value) {
-      FLog.info(className: "Sides", methodName: "uploadImage", text: "Answer: $value");
+      FLog.info(
+          className: "Sides",
+          methodName: "uploadImage",
+          text: "Answer: $value");
     });
-    FLog.info(className: "Sides", methodName: "uploadImage", text: "Image uploaded");
+    FLog.info(
+        className: "Sides", methodName: "uploadImage", text: "Image uploaded");
     return true;
   }
-  FLog.info(className: "Sides", methodName: "uploadImage", text: "Upload not successful!");
+  FLog.info(
+      className: "Sides",
+      methodName: "uploadImage",
+      text: "Upload not successful!");
   return false;
 }
 
@@ -169,7 +197,8 @@ save(File image, CarSides predictedSide,
   String filename =
       X.toString() + Y.toString() + "_" + "Cars" + currentTimeStamp + ".jpg";
 
-  FLog.info(className: "Sides", methodName: "Save", text: "filename: $filename");
+  FLog.info(
+      className: "Sides", methodName: "Save", text: "filename: $filename");
   var appDir = await getExternalStorageDirectory();
   late String fileFullPath;
   if (appDir != null) {
@@ -177,7 +206,10 @@ save(File image, CarSides predictedSide,
   }
 
   final File localImage = await image.copy('$fileFullPath');
-  FLog.info(className: "Sides", methodName: "Save", text: "localImage.path: ${localImage.path}");
+  FLog.info(
+      className: "Sides",
+      methodName: "Save",
+      text: "localImage.path: ${localImage.path}");
 }
 
 Future<String> getFileSize(File file, int decimals) async {

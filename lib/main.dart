@@ -32,6 +32,7 @@ class CameraInterface {
       camera,
       res,
       enableAudio: false,
+      flashMode: FlashMode.off,
       // imageFormatGroup: ImageFormatGroup.yuv420,
     );
     initializeControllerFuture = controller.initialize();
@@ -174,6 +175,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
 //Take a picture
   Future getImage() async {
+    print(_pictureScreen.cameraInterface.controller.flashMode);
     if(!getImageStarted) {
       getImageStarted = true;
       FLog.info(
@@ -185,7 +187,13 @@ class _MyHomePageState extends State<MyHomePage> {
         // XFile xImage =
         //     await _pictureScreen.cameraInterface.controller.takePicture();
         var cacheDir = await getTemporaryDirectory();
+
         var path = cacheDir.path + "/thumbnail.jpg";
+        if(await File(path).exists())
+          {
+            print("file exist");
+            File(path).delete();
+          }
         await _pictureScreen.cameraInterface.controller.takePicture(path);
         _imageFile = Img(path: path);
         await _imageFile!.initializationDone;
