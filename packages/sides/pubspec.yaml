@@ -15,8 +15,10 @@ dependencies:
   http: ^0.13.3
   http_parser: ^4.0.0
   strings: ^0.2.2
-
-
+#  f_logs: ^2.0.0
+  f_logs:
+    git:
+      url: git://github.com/draganjovanovic1/Flogs
 
 
 

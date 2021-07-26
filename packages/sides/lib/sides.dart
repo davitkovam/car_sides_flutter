@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:strings/strings.dart';
+import 'package:f_logs/f_logs.dart';
 
 class CarSides {
   // final List<String> _sides = ['Front', 'Back', 'Left', 'Right', 'Diagonal'];
@@ -48,23 +49,23 @@ class CarSides {
 }
 
 backup() async {
-  print("Backing Up");
+  FLog.info(className: "Sides", methodName: "Backup", text: "Backing Up");
   var dir = await getExternalStorageDirectory();
   if (dir != null) {
-    print("dir: $dir");
+    FLog.info(className: "Sides", methodName: "Backup", text: "Directory: $dir");
     dir.list(recursive: false).forEach((f) async {
-      print("f: $f");
+      FLog.info(className: "Sides", methodName: "Backup", text: "f: $f");
       var pred =
           '${f.path.split("/")[f.path.split("/").length - 1][0]}'.toUpperCase();
       var real =
           '${f.path.split("/")[f.path.split("/").length - 1][1]}'.toUpperCase();
-      print("pred: $pred, real: $real");
+      FLog.info(className: "Sides", methodName: "Backup", text: "pred: $pred, real: $real");
       File fi = File(f.path);
       var uploaded = false;
       uploaded = await uploadImage(
           fi, new CarSides.fromLetter(pred), new CarSides.fromLetter(real));
       if (uploaded == true) {
-        print("Uploaded, deleted");
+        FLog.info(className: "Sides", methodName: "Backup", text: "Uploaded, deleted");
         await fi.delete();
       }
     });
@@ -88,8 +89,7 @@ Future<List<CarSides>> predict(
       numResults: 5,
       threshold: 0.1,
       asynch: true);
-  print("recognitions: $recognitions");
-
+  FLog.info(className: "Sides", methodName: "Predict", text: "Recognitions: $recognitions");
   List<CarSides> carSidesList = [];
   recognitions!.forEach((element) =>
       carSidesList.add(CarSides(element['label'], element['confidence'])));
@@ -107,7 +107,7 @@ Future<bool> internetAvailable() async {
       return true;
     }
   } on SocketException catch (_) {
-    print('not connected');
+    FLog.info(className: "Sides", methodName: "internetAvailable", text: "not connected");
     return false;
   }
   return false;
@@ -128,7 +128,7 @@ Future<bool> uploadImage(
     String fileName =
         X.toString() + Y.toString() + "_" + "Cars" + currentTimeStamp + ".jpg";
 
-    print("Internet Available");
+    FLog.info(className: "Sides", methodName: "uploadImage", text: "Internet Available");
     var stream = new http.ByteStream(image.openRead());
     stream.cast();
     var length = await image.length();
@@ -144,14 +144,14 @@ Future<bool> uploadImage(
 
     request.files.add(multipartFile);
     var response = await request.send();
-    print("statusCode: ${response.statusCode}");
+    FLog.info(className: "Sides", methodName: "uploadImage", text: "statusCode: ${response.statusCode}");
     response.stream.transform(utf8.decoder).listen((value) {
-      print("Answer: $value");
+      FLog.info(className: "Sides", methodName: "uploadImage", text: "Answer: $value");
     });
-    print("Image uploaded");
+    FLog.info(className: "Sides", methodName: "uploadImage", text: "Image uploaded");
     return true;
   }
-  print("Upload not successful!");
+  FLog.info(className: "Sides", methodName: "uploadImage", text: "Upload not successful!");
   return false;
 }
 
@@ -169,8 +169,7 @@ save(File image, CarSides predictedSide,
   String filename =
       X.toString() + Y.toString() + "_" + "Cars" + currentTimeStamp + ".jpg";
 
-  print("filename: $filename");
-
+  FLog.info(className: "Sides", methodName: "Save", text: "filename: $filename");
   var appDir = await getExternalStorageDirectory();
   late String fileFullPath;
   if (appDir != null) {
@@ -178,7 +177,7 @@ save(File image, CarSides predictedSide,
   }
 
   final File localImage = await image.copy('$fileFullPath');
-  print("localImage.path: ${localImage.path}");
+  FLog.info(className: "Sides", methodName: "Save", text: "localImage.path: ${localImage.path}");
 }
 
 Future<String> getFileSize(File file, int decimals) async {
