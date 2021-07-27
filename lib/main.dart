@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import 'package:sides/sides.dart';
+// import 'package:intl/intl.dart';
 
 // import 'package:camera/camera.dart';
 import 'package:flutter_better_camera/camera.dart';
@@ -72,7 +73,7 @@ class Img {
   }
 
   Future init() async {
-    await getFileSize(file!, 2).then((value) => this.size = value);
+    size = await getFileSize(file!, 2);
   }
 
   int get width => image!.width;
@@ -162,8 +163,8 @@ class _MyHomePageState extends State<MyHomePage> {
   late CarSides _predictedSide;
   late CarSides _realSide;
 
-  late TakePictureScreen _pictureScreen =
-      new TakePictureScreen(CameraInterface.cameras.first);
+  late ImagePreviewPage _pictureScreen =
+      new ImagePreviewPage(CameraInterface.cameras.first);
 
   bool getImageStarted = false;
 
@@ -187,6 +188,12 @@ class _MyHomePageState extends State<MyHomePage> {
         // XFile xImage =
         //     await _pictureScreen.cameraInterface.controller.takePicture();
         var cacheDir = await getTemporaryDirectory();
+/*
+        var now = DateTime.now();
+        var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
+        String currentTimeStamp = formatter.format(now);
+
+ */
 
         var path = cacheDir.path + "/thumbnail.jpg";
         if(await File(path).exists())
@@ -242,6 +249,7 @@ class _MyHomePageState extends State<MyHomePage> {
           _onItemTapped(1);
         });
         _realSide = await _showSingleChoiceDialog(context);
+        print("RealSide: "+_realSide.label);
 
         FLog.info(
             className: "MyHomePage",
@@ -301,7 +309,7 @@ class _MyHomePageState extends State<MyHomePage> {
       onPageChanged: _pageChanged,
       children: <Widget>[
         _pictureScreen,
-        DisplayPictureScreen(_imageFile, _predictedSideList),
+        ImageInfoPage(_imageFile, _predictedSideList),
         LogPage()
       ],
     );
@@ -347,24 +355,25 @@ class _MyHomePageState extends State<MyHomePage> {
     else
       return null;
   }
+
 }
 
-class TakePictureScreen extends StatefulWidget {
+class ImagePreviewPage extends StatefulWidget {
   final CameraDescription? camera;
   final CameraInterface cameraInterface = new CameraInterface();
 
-  TakePictureScreen(this.camera, {Key? key}) : super(key: key);
+  ImagePreviewPage(this.camera, {Key? key}) : super(key: key);
 
   controllerInitialize(ResolutionPreset res) =>
       cameraInterface.controllerInitialize(camera, res);
 
   @override
-  TakePictureScreenState createState() => TakePictureScreenState();
+  ImagePreviewPageState createState() => ImagePreviewPageState();
 }
 
-class TakePictureScreenState extends State<TakePictureScreen>
+class ImagePreviewPageState extends State<ImagePreviewPage>
     with WidgetsBindingObserver {
-  ResolutionPreset resolution = ResolutionPreset.max;
+  ResolutionPreset resolution = ResolutionPreset.high;
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -372,10 +381,7 @@ class TakePictureScreenState extends State<TakePictureScreen>
         className: "TakePictureScreenState",
         methodName: "AppState",
         text: "state changed to: $state");
-    FLog.info(
-        className: "TakePictureScreenState",
-        methodName: "AppState",
-        text: "cameraStarted: ${widget.cameraInterface.cameraStarted}");
+    // FLog.info(className: "TakePictureScreenState", methodName: "AppState", text: "cameraStarted: ${widget.cameraInterface.cameraStarted}");
     if (!widget.cameraInterface.cameraStarted &&
         state == AppLifecycleState.resumed) {
       widget.controllerInitialize(resolution);
@@ -401,7 +407,7 @@ class TakePictureScreenState extends State<TakePictureScreen>
     super.initState();
     // To display the current output from the Camera,
     // create a CameraController.
-    // WidgetsBinding.instance!.addObserver(this);
+    WidgetsBinding.instance!.addObserver(this);
   }
 
   @override
@@ -409,7 +415,7 @@ class TakePictureScreenState extends State<TakePictureScreen>
     // Dispose of the controller when the widget is disposed.
     // widget.cameraInterface.controller.dispose();
     // widget.cameraInterface.cameraStarted = false;
-    // WidgetsBinding.instance!.removeObserver(this);
+    WidgetsBinding.instance!.removeObserver(this);
     super.dispose();
   }
 
@@ -482,11 +488,15 @@ class SingleNotifier extends ChangeNotifier {
       notifyListeners();
     }
   }
+  resetSide()
+  {
+    _currentSide = CarSides.sides[0];
+  }
 }
 
 //Dialogue to ask for the real side
 Future<CarSides> _showSingleChoiceDialog(BuildContext context) {
-  SingleNotifier _singleNotifier;
+  SingleNotifier _singleNotifier = new SingleNotifier();
   final completer = new Completer<CarSides>();
   showDialog(
       context: context,
@@ -507,8 +517,9 @@ Future<CarSides> _showSingleChoiceDialog(BuildContext context) {
                           title: Text(capitalize(e)),
                           value: e,
                           groupValue: _singleNotifier.currentSide,
-                          selected: _singleNotifier.currentSide == e,
+                          selected:  _singleNotifier.currentSide == e,
                           onChanged: (value) {
+                            print(e);
                             if (value != _singleNotifier.currentSide) {
                               _singleNotifier.updateSide(value);
                             }
@@ -525,6 +536,7 @@ Future<CarSides> _showSingleChoiceDialog(BuildContext context) {
                 onPressed: () {
                   completer.complete(CarSides(_singleNotifier._currentSide));
                   Navigator.of(context).pop();
+                  _singleNotifier.resetSide();
                 },
               )
             ],
@@ -534,11 +546,11 @@ Future<CarSides> _showSingleChoiceDialog(BuildContext context) {
   return completer.future;
 }
 
-class DisplayPictureScreen extends StatelessWidget {
+class ImageInfoPage extends StatelessWidget {
   final Img? image;
   final List<CarSides>? carSidesList;
 
-  const DisplayPictureScreen(
+  const ImageInfoPage(
     this.image,
     this.carSidesList, {
     Key? key,
