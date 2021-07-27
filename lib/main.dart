@@ -6,13 +6,13 @@ import 'package:provider/provider.dart';
 import 'package:sides/sides.dart';
 // import 'package:intl/intl.dart';
 
-// import 'package:camera/camera.dart';
-import 'package:flutter_better_camera/camera.dart';
+import 'package:camera/camera.dart';
+// import 'package:flutter_better_camera/camera.dart';
 import 'package:strings/strings.dart';
 import 'package:image/image.dart' as ImagePackage;
 import 'package:f_logs/f_logs.dart';
 
-import 'package:path_provider/path_provider.dart';
+// import 'package:path_provider/path_provider.dart';
 //Possible classes
 
 class CameraInterface {
@@ -33,9 +33,10 @@ class CameraInterface {
       camera,
       res,
       enableAudio: false,
-      flashMode: FlashMode.off,
+      // flashMode: FlashMode.off,
       // imageFormatGroup: ImageFormatGroup.yuv420,
     );
+    controller.setFlashMode(FlashMode.off);
     initializeControllerFuture = controller.initialize();
   }
 }
@@ -176,7 +177,6 @@ class _MyHomePageState extends State<MyHomePage> {
 
 //Take a picture
   Future getImage() async {
-    print(_pictureScreen.cameraInterface.controller.flashMode);
     if(!getImageStarted) {
       getImageStarted = true;
       FLog.info(
@@ -185,9 +185,9 @@ class _MyHomePageState extends State<MyHomePage> {
           text: "getImage() started");
       try {
         await _pictureScreen.cameraInterface.initializeControllerFuture;
-        // XFile xImage =
-        //     await _pictureScreen.cameraInterface.controller.takePicture();
-        var cacheDir = await getTemporaryDirectory();
+        XFile xImage =
+            await _pictureScreen.cameraInterface.controller.takePicture();
+        // var cacheDir = await getTemporaryDirectory();
 /*
         var now = DateTime.now();
         var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
@@ -195,19 +195,19 @@ class _MyHomePageState extends State<MyHomePage> {
 
  */
 
-        var path = cacheDir.path + "/thumbnail.jpg";
-        if(await File(path).exists())
-          {
-            print("file exist");
-            File(path).delete();
-          }
-        await _pictureScreen.cameraInterface.controller.takePicture(path);
-        _imageFile = Img(path: path);
+        // var path = cacheDir.path + "/thumbnail.jpg";
+        // if(await File(path).exists())
+        //   {
+        //     print("file exist");
+        //     File(path).delete();
+        //   }
+        // await _pictureScreen.cameraInterface.controller.takePicture(path);
+        _imageFile = Img(path: xImage.path);
         await _imageFile!.initializationDone;
         FLog.info(
             className: "MyHomePage",
             methodName: "getImage",
-            text: "image path: $path");
+            text: "image path: ${_imageFile!.path}");
         // var cacheDir = await getTemporaryDirectory();
         // _croppedImage = _imageFile;
         // _croppedImage!.setPath('${cacheDir.path}/thumbnail.jpg');
@@ -378,15 +378,15 @@ class ImagePreviewPageState extends State<ImagePreviewPage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     FLog.info(
-        className: "TakePictureScreenState",
+        className: "ImagePreviewPageState",
         methodName: "AppState",
         text: "state changed to: $state");
-    // FLog.info(className: "TakePictureScreenState", methodName: "AppState", text: "cameraStarted: ${widget.cameraInterface.cameraStarted}");
+    // FLog.info(className: "ImagePreviewPageState", methodName: "AppState", text: "cameraStarted: ${widget.cameraInterface.cameraStarted}");
     if (!widget.cameraInterface.cameraStarted &&
         state == AppLifecycleState.resumed) {
       widget.controllerInitialize(resolution);
       FLog.info(
-          className: "TakePictureScreenState",
+          className: "ImagePreviewPageState",
           methodName: "AppState",
           text: "Initialize camera");
       widget.cameraInterface.cameraStarted = true;
@@ -394,7 +394,7 @@ class ImagePreviewPageState extends State<ImagePreviewPage>
           .then((value) => setState(() {}));
     } else if (widget.cameraInterface.cameraStarted) {
       FLog.info(
-          className: "TakePictureScreenState",
+          className: "ImagePreviewPageState",
           methodName: "AppState",
           text: "Dispose camera");
       widget.cameraInterface.controller.dispose();
@@ -427,7 +427,7 @@ class ImagePreviewPageState extends State<ImagePreviewPage>
       if (width <= 365 && height < 600) {
         resolution = ResolutionPreset.medium;
         FLog.info(
-            className: "TakePictureScreenState",
+            className: "ImagePreviewPageState",
             methodName: "Build",
             text: "Camera resolution changed: $resolution");
       }
@@ -458,7 +458,7 @@ class ImagePreviewPageState extends State<ImagePreviewPage>
               ]);
             } catch (e) {
               FLog.error(
-                  className: "TakePictureScreenState",
+                  className: "ImagePreviewPageState",
                   methodName: "Build",
                   text: "$e");
               return const Center(child: CircularProgressIndicator());
