@@ -166,7 +166,6 @@ class _MyHomePageState extends State<MyHomePage> {
   late ImagePreviewPage _pictureScreen =
       new ImagePreviewPage(CameraInterface.cameras.first);
 
-
   int _selectedIndex = 0;
   PageController pageController = PageController(
     initialPage: 0,
@@ -181,15 +180,18 @@ class _MyHomePageState extends State<MyHomePage> {
         methodName: "getImage",
         text: "getImage() started");
     try {
-      if (!_pictureScreen.cameraInterface.controller.value.isInitialized!)
-        {
-          FLog.warning(className: "MyHomePage", methodName: "getImage", text: "camera not initialized");
-          return;
-        }
-      else
-        {
-          FLog.info(className: "MyHomePage", methodName: "getImage", text: "camera initialized");
-        }
+      if (!_pictureScreen.cameraInterface.controller.value.isInitialized!) {
+        FLog.warning(
+            className: "MyHomePage",
+            methodName: "getImage",
+            text: "camera not initialized");
+        return;
+      } else {
+        FLog.info(
+            className: "MyHomePage",
+            methodName: "getImage",
+            text: "camera initialized");
+      }
       // await _pictureScreen.cameraInterface.initializeControllerFuture;
       // XFile xImage =
       //     await _pictureScreen.cameraInterface.controller.takePicture();
@@ -209,7 +211,10 @@ class _MyHomePageState extends State<MyHomePage> {
 
       try {
         if (_pictureScreen.cameraInterface.controller.value.isTakingPicture!) {
-          FLog.warning(className: "MyHomePage", methodName: "getImage", text: "camera is taking picture");
+          FLog.warning(
+              className: "MyHomePage",
+              methodName: "getImage",
+              text: "camera is taking picture");
           return;
         }
         await _pictureScreen.cameraInterface.controller.takePicture(path);
@@ -394,24 +399,47 @@ class ImagePreviewPageState extends State<ImagePreviewPage>
         methodName: "AppState",
         text: "state changed to: $state");
     // FLog.info(className: "TakePictureScreenState", methodName: "AppState", text: "cameraStarted: ${widget.cameraInterface.cameraStarted}");
-    if (!widget.cameraInterface.cameraStarted &&
-        state == AppLifecycleState.resumed) {
-      widget.controllerInitialize(resolution);
+    if (!widget.cameraInterface.controller.value.isInitialized!) {
       FLog.info(
           className: "TakePictureScreenState",
           methodName: "AppState",
-          text: "Initialize camera");
-      widget.cameraInterface.cameraStarted = true;
-      widget.cameraInterface.initializeControllerFuture
-          .then((value) => setState(() {}));
-    } else if (widget.cameraInterface.cameraStarted) {
+          text: "Controller not initialized");
+      return;
+    }
+    if (state == AppLifecycleState.inactive) {
       FLog.info(
           className: "TakePictureScreenState",
           methodName: "AppState",
           text: "Dispose camera");
       widget.cameraInterface.controller.dispose();
-      widget.cameraInterface.cameraStarted = false;
+    } else if (state == AppLifecycleState.resumed) {
+      FLog.info(
+          className: "TakePictureScreenState",
+          methodName: "AppState",
+          text: "Initialize camera");
+      widget.controllerInitialize(resolution);
+      widget.cameraInterface.initializeControllerFuture
+          .then((value) => setState(() {}));
     }
+
+    // if (!widget.cameraInterface.cameraStarted &&
+    //     state == AppLifecycleState.resumed) {
+    //   widget.controllerInitialize(resolution);
+    //   FLog.info(
+    //       className: "TakePictureScreenState",
+    //       methodName: "AppState",
+    //       text: "Initialize camera");
+    //   widget.cameraInterface.cameraStarted = true;
+    //   widget.cameraInterface.initializeControllerFuture
+    //       .then((value) => setState(() {}));
+    // } else if (widget.cameraInterface.cameraStarted) {
+    //   FLog.info(
+    //       className: "TakePictureScreenState",
+    //       methodName: "AppState",
+    //       text: "Dispose camera");
+    //   widget.cameraInterface.controller.dispose();
+    //   widget.cameraInterface.cameraStarted = false;
+    // }
   }
 
   @override
