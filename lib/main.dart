@@ -4,9 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import 'package:sides/sides.dart';
-// import 'package:intl/intl.dart';
-
-// import 'package:camera/camera.dart';
 import 'package:flutter_better_camera/camera.dart';
 import 'package:strings/strings.dart';
 import 'package:image/image.dart' as ImagePackage;
@@ -17,6 +14,7 @@ import 'package:path_provider/path_provider.dart';
 
 class CameraInterface {
   late CameraController controller;
+  int ziviGluposti=0;
   late Future<void> initializeControllerFuture;
   late bool cameraStarted = false;
 
@@ -164,9 +162,8 @@ class _MyHomePageState extends State<MyHomePage> {
   late CarSides _realSide;
 
   late ImagePreviewPage _pictureScreen =
-      new ImagePreviewPage(CameraInterface.cameras.first);
+  new ImagePreviewPage(CameraInterface.cameras.first);
 
-  bool getImageStarted = false;
 
   int _selectedIndex = 0;
   PageController pageController = PageController(
@@ -177,17 +174,24 @@ class _MyHomePageState extends State<MyHomePage> {
 //Take a picture
   Future getImage() async {
     print(_pictureScreen.cameraInterface.controller.flashMode);
-    if(!getImageStarted) {
-      getImageStarted = true;
-      FLog.info(
-          className: "MyHomePage",
-          methodName: "getImage",
-          text: "getImage() started");
-      try {
-        await _pictureScreen.cameraInterface.initializeControllerFuture;
-        // XFile xImage =
-        //     await _pictureScreen.cameraInterface.controller.takePicture();
-        var cacheDir = await getTemporaryDirectory();
+    FLog.info(
+        className: "MyHomePage",
+        methodName: "getImage",
+        text: "getImage() started");
+    try {
+      if (!_pictureScreen.cameraInterface.controller.value.isInitialized!)
+      {
+        FLog.warning(className: "MyHomePage", methodName: "getImage", text: "camera not initialized");
+        return;
+      }
+      else
+      {
+        FLog.info(className: "MyHomePage", methodName: "getImage", text: "camera initialized");
+      }
+      // await _pictureScreen.cameraInterface.initializeControllerFuture;
+      // XFile xImage =
+      //     await _pictureScreen.cameraInterface.controller.takePicture();
+      var cacheDir = await getTemporaryDirectory();
 /*
         var now = DateTime.now();
         var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
@@ -195,80 +199,87 @@ class _MyHomePageState extends State<MyHomePage> {
 
  */
 
-        var path = cacheDir.path + "/thumbnail.jpg";
-        if(await File(path).exists())
-          {
-            print("file exist");
-            File(path).delete();
-          }
-        await _pictureScreen.cameraInterface.controller.takePicture(path);
-        _imageFile = Img(path: path);
-        await _imageFile!.initializationDone;
-        FLog.info(
-            className: "MyHomePage",
-            methodName: "getImage",
-            text: "image path: $path");
-        // var cacheDir = await getTemporaryDirectory();
-        // _croppedImage = _imageFile;
-        // _croppedImage!.setPath('${cacheDir.path}/thumbnail.jpg');
-        FLog.info(
-            className: "MyHomePage",
-            methodName: "getImage",
-            text: "image resolution: ${_imageFile!.resolution}");
-
-        if (_imageFile!.width < _imageFile!.height) {
-          FLog.info(
-              className: "MyHomePage",
-              methodName: "getImage",
-              text: "height > width");
-          await _imageFile!.crop(
-              0,
-              (_imageFile!.height - _imageFile!.width) ~/ 2,
-              _imageFile!.width,
-              _imageFile!.width);
-        } else {
-          FLog.info(
-              className: "MyHomePage",
-              methodName: "getImage",
-              text: "width > height");
-          await _imageFile!.crop((_imageFile!.width - _imageFile!.height) ~/ 2,
-              0, _imageFile!.height, _imageFile!.height);
-        }
-
-        FLog.info(
-            className: "MyHomePage",
-            methodName: "getImage",
-            text: "croppedImage resolution: ${_imageFile!.resolution}");
-
-        await _imageFile!.resize(240, 240);
-
-        _predictedSideList = await predict(_imageFile!.file!);
-        _predictedSide = _predictedSideList![0];
-
-        setState(() {
-          _onItemTapped(1);
-        });
-        _realSide = await _showSingleChoiceDialog(context);
-        print("RealSide: "+_realSide.label);
-
-        FLog.info(
-            className: "MyHomePage",
-            methodName: "getImage",
-            text: "realSide: $_realSide, predictedSide: $_predictedSide");
-
-        setState(() {});
-        var uploaded = false;
-        uploaded = await uploadImage(_imageFile!.file!, _predictedSide,
-            _realSide); //TODO: Finish upload function in sides.dart
-        if (uploaded == false) {
-          await save(_imageFile!.file!, _predictedSide,
-              _realSide); //Saves image with correct naming
-        }
-        await backup();
-        getImageStarted = false;
-      } catch (e) {
-        FLog.error(className: "MyHomePage", methodName: "getImage", text: "$e");
+      var path = cacheDir.path + "/thumbnail.jpg";
+      if (await File(path).exists()) {
+        print("file exist");
+        File(path).delete();
       }
+
+      try {
+        if (_pictureScreen.cameraInterface.controller.value.isTakingPicture!) {
+          FLog.warning(className: "MyHomePage", methodName: "getImage", text: "camera is taking picture");
+          return;
+        }
+        await _pictureScreen.cameraInterface.controller.takePicture(path);
+      } catch (e) {
+        FLog.error(
+            className: "MyHomePage",
+            methodName: "getImage takePicture()",
+            text: "$e");
+      }
+
+      _imageFile = Img(path: path);
+      await _imageFile!.initializationDone;
+      FLog.info(
+          className: "MyHomePage",
+          methodName: "getImage",
+          text: "image path: $path");
+      // var cacheDir = await getTemporaryDirectory();
+      // _croppedImage = _imageFile;
+      // _croppedImage!.setPath('${cacheDir.path}/thumbnail.jpg');
+      FLog.info(
+          className: "MyHomePage",
+          methodName: "getImage",
+          text: "image resolution: ${_imageFile!.resolution}");
+
+      if (_imageFile!.width < _imageFile!.height) {
+        FLog.info(
+            className: "MyHomePage",
+            methodName: "getImage",
+            text: "height > width");
+        await _imageFile!.crop(0, (_imageFile!.height - _imageFile!.width) ~/ 2,
+            _imageFile!.width, _imageFile!.width);
+      } else {
+        FLog.info(
+            className: "MyHomePage",
+            methodName: "getImage",
+            text: "width > height");
+        await _imageFile!.crop((_imageFile!.width - _imageFile!.height) ~/ 2, 0,
+            _imageFile!.height, _imageFile!.height);
+      }
+
+      FLog.info(
+          className: "MyHomePage",
+          methodName: "getImage",
+          text: "croppedImage resolution: ${_imageFile!.resolution}");
+
+      await _imageFile!.resize(240, 240);
+
+      _predictedSideList = await predict(_imageFile!.file!);
+      _predictedSide = _predictedSideList![0];
+
+      setState(() {
+        _onItemTapped(1);
+      });
+      _realSide = await _showSingleChoiceDialog(context);
+      print("RealSide: " + _realSide.label);
+
+      FLog.info(
+          className: "MyHomePage",
+          methodName: "getImage",
+          text: "realSide: $_realSide, predictedSide: $_predictedSide");
+
+      setState(() {});
+      var uploaded = false;
+      uploaded = await uploadImage(_imageFile!.file!, _predictedSide,
+          _realSide); //TODO: Finish upload function in sides.dart
+      if (uploaded == false) {
+        await save(_imageFile!.file!, _predictedSide,
+            _realSide); //Saves image with correct naming
+      }
+      await backup();
+    } catch (e) {
+      FLog.error(className: "MyHomePage", methodName: "getImage", text: "$e");
     }
   }
 
@@ -355,7 +366,6 @@ class _MyHomePageState extends State<MyHomePage> {
     else
       return null;
   }
-
 }
 
 class ImagePreviewPage extends StatefulWidget {
@@ -445,9 +455,9 @@ class ImagePreviewPageState extends State<ImagePreviewPage>
                 Positioned.fill(
                     child: AspectRatio(
                         aspectRatio:
-                            widget.cameraInterface.controller.value.aspectRatio,
+                        widget.cameraInterface.controller.value.aspectRatio,
                         child:
-                            CameraPreview(widget.cameraInterface.controller))),
+                        CameraPreview(widget.cameraInterface.controller))),
                 Container(
                   width: width,
                   height: width,
@@ -488,8 +498,8 @@ class SingleNotifier extends ChangeNotifier {
       notifyListeners();
     }
   }
-  resetSide()
-  {
+
+  resetSide() {
     _currentSide = CarSides.sides[0];
   }
 }
@@ -514,18 +524,18 @@ Future<CarSides> _showSingleChoiceDialog(BuildContext context) {
                   children: CarSides.sides
                       .map(
                         (e) => RadioListTile(
-                          title: Text(capitalize(e)),
-                          value: e,
-                          groupValue: _singleNotifier.currentSide,
-                          selected:  _singleNotifier.currentSide == e,
-                          onChanged: (value) {
-                            print(e);
-                            if (value != _singleNotifier.currentSide) {
-                              _singleNotifier.updateSide(value);
-                            }
-                          },
-                        ),
-                      )
+                      title: Text(capitalize(e)),
+                      value: e,
+                      groupValue: _singleNotifier.currentSide,
+                      selected: _singleNotifier.currentSide == e,
+                      onChanged: (value) {
+                        print(e);
+                        if (value != _singleNotifier.currentSide) {
+                          _singleNotifier.updateSide(value);
+                        }
+                      },
+                    ),
+                  )
                       .toList(),
                 ),
               ),
@@ -551,14 +561,14 @@ class ImageInfoPage extends StatelessWidget {
   final List<CarSides>? carSidesList;
 
   const ImageInfoPage(
-    this.image,
-    this.carSidesList, {
-    Key? key,
-  }) : super(key: key);
+      this.image,
+      this.carSidesList, {
+        Key? key,
+      }) : super(key: key);
 
   List<Widget> description() {
     final TextStyle textStyle =
-        TextStyle(color: Colors.white70, fontWeight: FontWeight.bold);
+    TextStyle(color: Colors.white70, fontWeight: FontWeight.bold);
     List<Widget> widgetList = [];
     widgetList.add(Row(
       // mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -575,19 +585,19 @@ class ImageInfoPage extends StatelessWidget {
       ],
     ));
     carSidesList!.forEach((element) => widgetList.add(Row(
-          // mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            Text(
-              capitalize(element.label),
-              style: textStyle,
-            ),
-            Spacer(),
-            Text(
-              element.confidenceToPercent(),
-              style: textStyle,
-            )
-          ],
-        )));
+      // mainAxisAlignment: MainAxisAlignment.spaceAround,
+      children: [
+        Text(
+          capitalize(element.label),
+          style: textStyle,
+        ),
+        Spacer(),
+        Text(
+          element.confidenceToPercent(),
+          style: textStyle,
+        )
+      ],
+    )));
     return widgetList;
   }
 
@@ -606,43 +616,43 @@ class ImageInfoPage extends StatelessWidget {
       color: Colors.black,
       child: image == null
           ? Icon(
-              Icons.image_not_supported,
-              color: Colors.white,
-              size: 100,
-            )
+        Icons.image_not_supported,
+        color: Colors.white,
+        size: 100,
+      )
           : Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Image.file(
-                  image!.file!,
-                  fit: BoxFit.fitWidth,
-                  width: double.infinity,
-                  // alignment: Alignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Image.file(
+            image!.file!,
+            fit: BoxFit.fitWidth,
+            width: double.infinity,
+            // alignment: Alignment.center,
+          ),
+          Align(
+            alignment: Alignment.bottomLeft,
+            child: Container(
+              // alignment: Alignment.bottomLeft,
+              width: MediaQuery.of(context).size.width / 2,
+              // height: 100,
+              padding: EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+              margin: EdgeInsets.only(top: 10, left: 20),
+              decoration: BoxDecoration(
+                // color: Colors.white70,
+                borderRadius: BorderRadius.all(
+                  Radius.circular(15),
                 ),
-                Align(
-                  alignment: Alignment.bottomLeft,
-                  child: Container(
-                    // alignment: Alignment.bottomLeft,
-                    width: MediaQuery.of(context).size.width / 2,
-                    // height: 100,
-                    padding: EdgeInsets.symmetric(vertical: 10, horizontal: 15),
-                    margin: EdgeInsets.only(top: 10, left: 20),
-                    decoration: BoxDecoration(
-                      // color: Colors.white70,
-                      borderRadius: BorderRadius.all(
-                        Radius.circular(15),
-                      ),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      // mainAxisSize: MainAxisSize.max,
-                      children: description(),
-                    ),
-                  ),
-                ),
-              ],
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                // mainAxisSize: MainAxisSize.max,
+                children: description(),
+              ),
             ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -661,62 +671,62 @@ class _LogPageState extends State<LogPage> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            DropdownButton(
-              value: dropdownValue,
-              onChanged: (LogLevel? newValue) {
-                if (newValue != dropdownValue) {
-                  setState(() {
-                    dropdownValue = newValue!;
-                  });
-                }
-              },
-              items: [LogLevel.ALL, LogLevel.INFO, LogLevel.ERROR]
-                  .map((LogLevel value) {
-                return DropdownMenuItem(
-                  value: value,
-                  child: Text(value.toString()),
-                );
-              }).toList(),
-            ),
-            ElevatedButton(
-              child: Text('Clear Logs'),
-              onPressed: () {
-                setState(() {
-                  FLog.clearLogs();
-                });
-              },
-            ),
-          ],
+      Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
+      children: [
+        DropdownButton(
+          value: dropdownValue,
+          onChanged: (LogLevel? newValue) {
+            if (newValue != dropdownValue) {
+              setState(() {
+                dropdownValue = newValue!;
+              });
+            }
+          },
+          items: [LogLevel.ALL, LogLevel.INFO, LogLevel.ERROR]
+              .map((LogLevel value) {
+            return DropdownMenuItem(
+              value: value,
+              child: Text(value.toString()),
+            );
+          }).toList(),
         ),
-        Expanded(
-          child: FutureBuilder(
-              future: FLog.getAllLogsByFilter(
-                  logLevels: dropdownValue == LogLevel.ALL
-                      ? []
-                      : [dropdownValue.toString()]),
-              builder:
-                  (BuildContext context, AsyncSnapshot<List<Log>> snapshot) {
-                if (snapshot.connectionState == ConnectionState.done) {
-                  return ListView.builder(
-                      itemCount: snapshot.data!.length,
-                      itemBuilder: (BuildContext context, int index) {
-                        return Padding(
-                          padding: const EdgeInsets.all(5.0),
-                          child: Text(
-                            "${snapshot.data![index].logLevel} ${snapshot.data![index].className} ${snapshot.data![index].methodName} ${snapshot.data![index].text!} ${snapshot.data![index].timestamp}",
-                            style: TextStyle(fontSize: 18),
-                          ),
-                        );
-                      });
-                } else {
-                  return Container();
-                }
-              }),
+        ElevatedButton(
+          child: Text('Clear Logs'),
+          onPressed: () {
+            setState(() {
+              FLog.clearLogs();
+            });
+          },
         ),
       ],
+    ),
+    Expanded(
+    child: FutureBuilder(
+    future: FLog.getAllLogsByFilter(
+    logLevels: dropdownValue == LogLevel.ALL
+    ? []
+        : [dropdownValue.toString()]),
+    builder:
+    (BuildContext context, AsyncSnapshot<List<Log>> snapshot) {
+    if (snapshot.connectionState == ConnectionState.done) {
+    return ListView.builder(
+    itemCount: snapshot.data!.length,
+    itemBuilder: (BuildContext context, int index) {
+    return Padding(
+    padding: const EdgeInsets.all(5.0),
+    child: Text(
+    "${snapshot.data![index].logLevel} ${snapshot.data![index].className} ${snapshot.data![index].methodName} ${snapshot.data![index].text!} ${snapshot.data![index].timestamp}",
+    style: TextStyle(fontSize: 18),
+    ),
+    );
+    });
+    } else {
+    return Container();
+    }
+    }),
+    ),
+    ],
     );
   }
 }
