@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import 'package:sides/sides.dart';
+import 'package:intl/intl.dart';
 
 // import 'package:camera/camera.dart';
 import 'package:flutter_better_camera/camera.dart';
@@ -187,6 +188,12 @@ class _MyHomePageState extends State<MyHomePage> {
         // XFile xImage =
         //     await _pictureScreen.cameraInterface.controller.takePicture();
         var cacheDir = await getTemporaryDirectory();
+/*
+        var now = DateTime.now();
+        var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
+        String currentTimeStamp = formatter.format(now);
+
+ */
 
         var path = cacheDir.path + "/thumbnail.jpg";
         if(await File(path).exists())
@@ -242,6 +249,7 @@ class _MyHomePageState extends State<MyHomePage> {
           _onItemTapped(1);
         });
         _realSide = await _showSingleChoiceDialog(context);
+        print("RealSide: "+_realSide.label);
 
         FLog.info(
             className: "MyHomePage",
@@ -347,6 +355,7 @@ class _MyHomePageState extends State<MyHomePage> {
     else
       return null;
   }
+
 }
 
 class TakePictureScreen extends StatefulWidget {
@@ -482,15 +491,21 @@ class SingleNotifier extends ChangeNotifier {
       notifyListeners();
     }
   }
+  resetSide()
+  {
+    _currentSide = CarSides.sides[0];
+  }
 }
 
 //Dialogue to ask for the real side
 Future<CarSides> _showSingleChoiceDialog(BuildContext context) {
-  SingleNotifier _singleNotifier;
+  SingleNotifier _singleNotifier = new SingleNotifier();
+  _singleNotifier.resetSide();
   final completer = new Completer<CarSides>();
   showDialog(
       context: context,
       builder: (context) {
+
         _singleNotifier = Provider.of<SingleNotifier>(context);
         return WillPopScope(
           onWillPop: () async => false,
@@ -507,8 +522,9 @@ Future<CarSides> _showSingleChoiceDialog(BuildContext context) {
                           title: Text(capitalize(e)),
                           value: e,
                           groupValue: _singleNotifier.currentSide,
-                          selected: _singleNotifier.currentSide == e,
+                          selected:  _singleNotifier.currentSide == e,
                           onChanged: (value) {
+                            print(e);
                             if (value != _singleNotifier.currentSide) {
                               _singleNotifier.updateSide(value);
                             }
@@ -524,7 +540,9 @@ Future<CarSides> _showSingleChoiceDialog(BuildContext context) {
                 child: new Text("OK"),
                 onPressed: () {
                   completer.complete(CarSides(_singleNotifier._currentSide));
+                  _singleNotifier.resetSide();
                   Navigator.of(context).pop();
+                  _singleNotifier.resetSide();
                 },
               )
             ],
