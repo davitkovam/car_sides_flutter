@@ -13,6 +13,7 @@ import 'package:image/image.dart' as ImagePackage;
 import 'package:f_logs/f_logs.dart';
 
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter/services.dart' show rootBundle;
 //Possible classes
 
 class CameraInterface {
@@ -172,9 +173,17 @@ class _MyHomePageState extends State<MyHomePage> {
     keepPage: true,
   );
 
+  Future<File> getImageFileFromAssets(String path) async {
+    final byteData = await rootBundle.load('assets/$path');
+
+    final file = File('${(await getTemporaryDirectory()).path}/$path');
+    await file.writeAsBytes(byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
+
+    return file;
+  }
 //Take a picture
   Future getImage() async {
-    print(_pictureScreen.cameraInterface.controller.flashMode);
+/*    print(_pictureScreen.cameraInterface.controller.flashMode);
     FLog.info(
         className: "MyHomePage",
         methodName: "getImage",
@@ -191,25 +200,26 @@ class _MyHomePageState extends State<MyHomePage> {
             className: "MyHomePage",
             methodName: "getImage",
             text: "camera initialized");
-      }
+      }*/
+      File f = await getImageFileFromAssets('car.jpg');
       // await _pictureScreen.cameraInterface.initializeControllerFuture;
       // XFile xImage =
       //     await _pictureScreen.cameraInterface.controller.takePicture();
-      var cacheDir = await getTemporaryDirectory();
+/*      var cacheDir = await getTemporaryDirectory();
 
         var now = DateTime.now();
         var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
         String currentTimeStamp = formatter.format(now);
 
 
-      var path = cacheDir.path + "/" + currentTimeStamp;
+      var path = cacheDir.path + "/" + currentTimeStamp;*/
       // var path = cacheDir.path + "/thumbnail.jpg";
       // if (await File(path).exists()) {
       //   print("file exist");
       //   File(path).delete();
       // }
 
-      try {
+/*      try {
         if (_pictureScreen.cameraInterface.controller.value.isTakingPicture!) {
           FLog.warning(
               className: "MyHomePage",
@@ -223,14 +233,14 @@ class _MyHomePageState extends State<MyHomePage> {
             className: "MyHomePage",
             methodName: "getImage takePicture()",
             text: "$e");
-      }
+      }*/
 
-      _imageFile = Img(path: path);
+      _imageFile = Img(path: f.path);
       await _imageFile!.initializationDone;
-      FLog.info(
-          className: "MyHomePage",
-          methodName: "getImage",
-          text: "image path: $path");
+      // FLog.info(
+      //     className: "MyHomePage",
+      //     methodName: "getImage",
+      //     text: "image path: $path");
       // var cacheDir = await getTemporaryDirectory();
       // _croppedImage = _imageFile;
       // _croppedImage!.setPath('${cacheDir.path}/thumbnail.jpg');
@@ -286,10 +296,10 @@ class _MyHomePageState extends State<MyHomePage> {
       }
       await backup();
 
-      File(path).delete();
-    } catch (e) {
-      FLog.error(className: "MyHomePage", methodName: "getImage", text: "$e");
-    }
+      // File(path).delete();
+    // } catch (e) {
+    //   FLog.error(className: "MyHomePage", methodName: "getImage", text: "$e");
+    // }
   }
 
   @override
