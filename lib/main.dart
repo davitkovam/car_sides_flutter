@@ -249,28 +249,28 @@ class _MyHomePageState extends State<MyHomePage> {
           methodName: "getImage",
           text: "image resolution: ${_imageFile!.resolution}");
 
-      if (_imageFile!.width < _imageFile!.height) {
-        FLog.info(
-            className: "MyHomePage",
-            methodName: "getImage",
-            text: "height > width");
-        await _imageFile!.crop(0, (_imageFile!.height - _imageFile!.width) ~/ 2,
-            _imageFile!.width, _imageFile!.width);
-      } else {
-        FLog.info(
-            className: "MyHomePage",
-            methodName: "getImage",
-            text: "width > height");
-        await _imageFile!.crop((_imageFile!.width - _imageFile!.height) ~/ 2, 0,
-            _imageFile!.height, _imageFile!.height);
-      }
-
-      FLog.info(
-          className: "MyHomePage",
-          methodName: "getImage",
-          text: "croppedImage resolution: ${_imageFile!.resolution}");
-
-      await _imageFile!.resize(240, 240);
+      // if (_imageFile!.width < _imageFile!.height) {
+      //   FLog.info(
+      //       className: "MyHomePage",
+      //       methodName: "getImage",
+      //       text: "height > width");
+      //   await _imageFile!.crop(0, (_imageFile!.height - _imageFile!.width) ~/ 2,
+      //       _imageFile!.width, _imageFile!.width);
+      // } else {
+      //   FLog.info(
+      //       className: "MyHomePage",
+      //       methodName: "getImage",
+      //       text: "width > height");
+      //   await _imageFile!.crop((_imageFile!.width - _imageFile!.height) ~/ 2, 0,
+      //       _imageFile!.height, _imageFile!.height);
+      // }
+      //
+      // FLog.info(
+      //     className: "MyHomePage",
+      //     methodName: "getImage",
+      //     text: "croppedImage resolution: ${_imageFile!.resolution}");
+      //
+      // await _imageFile!.resize(240, 240);
 
       _predictedSideList = await predict(_imageFile!.file!);
       _predictedSide = _predictedSideList![0];
