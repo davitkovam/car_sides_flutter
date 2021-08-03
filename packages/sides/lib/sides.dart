@@ -174,9 +174,19 @@ Future<bool> uploadImage(
           methodName: "uploadImage",
           text: "Answer: $value");
     });
-    FLog.info(
-        className: "Sides", methodName: "uploadImage", text: "Image uploaded");
-    return true;
+    if (response.statusCode == 200) {
+      FLog.info(
+          className: "Sides",
+          methodName: "uploadImage",
+          text: "Image uploaded");
+      return true;
+    } else {
+      FLog.info(
+          className: "Sides",
+          methodName: "uploadImage",
+          text: "Image not uploaded bad statusCode");
+      return false;
+    }
   } catch (e) {
     FLog.error(
         className: "Sides",
