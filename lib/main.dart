@@ -197,9 +197,9 @@ class _MyHomePageState extends State<MyHomePage> {
       //     await _pictureScreen.cameraInterface.controller.takePicture();
       var cacheDir = await getTemporaryDirectory();
 
-        var now = DateTime.now();
-        var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
-        String currentTimeStamp = formatter.format(now);
+      var now = DateTime.now();
+      var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
+      String currentTimeStamp = formatter.format(now);
 
 
       var path = cacheDir.path + "/" + currentTimeStamp;
@@ -260,7 +260,7 @@ class _MyHomePageState extends State<MyHomePage> {
           methodName: "getImage",
           text: "croppedImage resolution: ${_imageFile!.resolution}");
 
-      await _imageFile!.resize(240, 240);
+      await _imageFile!.resize(256, 256);
 
       _predictedSideList = await predict(_imageFile!.file!);
       _predictedSide = _predictedSideList![0];

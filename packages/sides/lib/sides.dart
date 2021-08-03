@@ -55,8 +55,7 @@ backup() async {
     FLog.info(
         className: "Sides", methodName: "Backup", text: "Directory: $dir");
     dir.list(recursive: false).forEach((f) async {
-      if (f.path.contains(".jpg"))
-      {
+      if (f.path.contains(".jpg")) {
         FLog.info(className: "Sides", methodName: "Backup", text: "f: $f");
         var pred = '${f.path.split("/")[f.path.split("/").length - 1][0]}'
             .toUpperCase();
@@ -132,25 +131,27 @@ Future<bool> internetAvailable() async {
 Future<bool> uploadImage(
     File image, CarSides predictedSide, CarSides realSide) async //In progress
 {
-  if (await internetAvailable()) {
-    var now = DateTime.now();
-    var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
-    String currentTimeStamp = formatter.format(now);
+  if (!await internetAvailable()) {
+    return false;
+  }
+  var now = DateTime.now();
+  var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
+  String currentTimeStamp = formatter.format(now);
 
-    //XY_Cars -> X = predicted, Y=real
-    String X = predictedSide.firstLetter();
-    String Y = realSide.firstLetter();
+  //XY_Cars -> X = predicted, Y=real
+  String X = predictedSide.firstLetter();
+  String Y = realSide.firstLetter();
 
-    String fileName = X + Y + "_" + "Cars" + currentTimeStamp + ".jpg";
-    // print(fileName);
-    FLog.info(
-        className: "Sides",
-        methodName: "uploadImage",
-        text: "Internet Available");
-    var stream = new http.ByteStream(image.openRead());
-    stream.cast();
-    var length = await image.length();
-
+  String fileName = X + Y + "_" + "Cars" + currentTimeStamp + ".jpg";
+  // print(fileName);
+  FLog.info(
+      className: "Sides",
+      methodName: "uploadImage",
+      text: "Internet Available");
+  var stream = new http.ByteStream(image.openRead());
+  stream.cast();
+  var length = await image.length();
+  try {
     var uri = Uri.parse("https://carsides.coci.result.si/upload.php");
 
     var request = new http.MultipartRequest("POST", uri)
@@ -162,6 +163,7 @@ Future<bool> uploadImage(
 
     request.files.add(multipartFile);
     var response = await request.send();
+
     FLog.info(
         className: "Sides",
         methodName: "uploadImage",
@@ -172,15 +174,26 @@ Future<bool> uploadImage(
           methodName: "uploadImage",
           text: "Answer: $value");
     });
-    FLog.info(
-        className: "Sides", methodName: "uploadImage", text: "Image uploaded");
-    return true;
+    if (response.statusCode == 200) {
+      FLog.info(
+          className: "Sides",
+          methodName: "uploadImage",
+          text: "Image uploaded");
+      return true;
+    } else {
+      FLog.info(
+          className: "Sides",
+          methodName: "uploadImage",
+          text: "Image not uploaded bad statusCode");
+      return false;
+    }
+  } catch (e) {
+    FLog.error(
+        className: "Sides",
+        methodName: "uploadImage",
+        text: "Server doesn't available");
+    return false;
   }
-  FLog.info(
-      className: "Sides",
-      methodName: "uploadImage",
-      text: "Upload not successful!");
-  return false;
 }
 
 save(File image, CarSides predictedSide,
