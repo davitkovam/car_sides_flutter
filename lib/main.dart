@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -12,8 +13,39 @@ import 'package:strings/strings.dart';
 import 'package:image/image.dart' as ImagePackage;
 import 'package:f_logs/f_logs.dart';
 
+import 'package:background_fetch/background_fetch.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:path_provider/path_provider.dart';
+
+
+import 'package:flutter/services.dart';
+
+const EVENTS_KEY = "fetch_events";
+
 //Possible classes
+
+void backgroundFetchHeadlessTask() async {
+  print('[BackgroundFetch] Headless event received.');
+  //print("Hey Pawan Background headless fetch is successful");
+
+  backup();
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+
+  // Read fetch_events from SharedPreferences
+  List<String> events = [];
+  String? json = prefs.getString(EVENTS_KEY);
+  if (json != null) {
+    events = jsonDecode(json).cast<String>();
+  }
+  // Add new event.
+  events.insert(0, new DateTime.now().toString() + ' [Headless]');
+  // Persist fetch events in SharedPreferences
+  prefs.setString(EVENTS_KEY, jsonEncode(events));
+
+  BackgroundFetch.finish();
+}
+
 
 class CameraInterface {
   late CameraController controller;
@@ -105,15 +137,19 @@ Future<void> main() async {
       child: MyApp(),
     ),
   );
+
+  BackgroundFetch.registerHeadlessTask(backgroundFetchHeadlessTask);
 }
 
 class MyApp extends StatelessWidget {
   // This widget is the root of your application.
   // final CameraDescription camera;
 
+
   MyApp({Key? key}) : super(key: key);
 
   @override
+
   Widget build(BuildContext context) {
     return MaterialApp(
       theme: ThemeData(
@@ -156,6 +192,15 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+
+
+  // Platform messages are asynchronous, so we initialize in an async method.
+
+
+
+
+
+
   Img? _imageFile;
 
   // Img? _croppedImage;
@@ -375,6 +420,116 @@ class _MyHomePageState extends State<MyHomePage> {
     else
       return null;
   }
+
+
+
+  bool _enabled = true;
+  int _status = 0;
+  List<String> _events = [];
+
+  @override
+  void initState() {
+    super.initState();
+    initPlatformState();
+  }
+
+  // Platform messages are asynchronous, so we initialize in an async method.
+  Future<void> initPlatformState() async {
+    // Load persisted fetch events from SharedPreferences
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? json = prefs.getString(EVENTS_KEY);
+    if (json != null) {
+      setState(() {
+        _events = jsonDecode(json).cast<String>();
+      });
+    }
+
+    // Configure BackgroundFetch.
+    BackgroundFetch.configure(
+        BackgroundFetchConfig(
+            minimumFetchInterval: 15,
+            stopOnTerminate: false,
+            enableHeadless: true,
+            forceReload: false),
+        _onBackgroundFetch)
+        .then((int status) {
+      print("Hey Pawan Background fetch is successful");
+      backup();
+      print('[BackgroundFetch] SUCCESS: $status');
+      setState(() {
+        _status = status;
+      });
+    }).catchError((e) {
+      print('[BackgroundFetch] ERROR: $e');
+      setState(() {
+        _status = e;
+      });
+    });
+
+    // Optionally query the current BackgroundFetch status.
+    int status = await BackgroundFetch.status;
+    setState(() {
+      _status = status;
+    });
+
+    // If the widget was removed from the tree while the asynchronous platform
+    // message was in flight, we want to discard the reply rather than calling
+    // setState to update our non-existent appearance.
+    if (!mounted) return;
+  }
+
+  void _onBackgroundFetch() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    // This is the fetch-event callback.
+    print('[BackgroundFetch] Event received');
+    setState(() {
+      _events.insert(0, new DateTime.now().toString());
+    });
+    // Persist fetch events in SharedPreferences
+    prefs.setString(EVENTS_KEY, jsonEncode(_events));
+    backup();
+    print("Tuka1");
+
+    // IMPORTANT:  You must signal completion of your fetch task or the OS can punish your app
+    // for taking too long in the background.
+    BackgroundFetch.finish();
+  }
+
+  void _onClickEnable(enabled) {
+    setState(() {
+      _enabled = enabled;
+    });
+    if (enabled) {
+      BackgroundFetch.start().then((int status) {
+        print('[BackgroundFetch] start success: $status');
+      }).catchError((e) {
+        print('[BackgroundFetch] start FAILURE: $e');
+      });
+    } else {
+      BackgroundFetch.stop().then((int status) {
+        print('[BackgroundFetch] stop success: $status');
+      });
+    }
+  }
+
+  void _onClickStatus() async {
+    int status = await BackgroundFetch.status;
+    print('[BackgroundFetch] status: $status');
+    setState(() {
+      _status = status;
+    });
+  }
+
+  void _onClickClear() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    prefs.remove(EVENTS_KEY);
+    setState(() {
+      _events = [];
+    });
+  }
+
+
 }
 
 class ImagePreviewPage extends StatefulWidget {
@@ -443,6 +598,7 @@ class ImagePreviewPageState extends State<ImagePreviewPage>
     //   widget.cameraInterface.cameraStarted = false;
     // }
   }
+
 
   @override
   void initState() {
@@ -762,3 +918,5 @@ class _LogPageState extends State<LogPage> {
     );
   }
 }
+
+

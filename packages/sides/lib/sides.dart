@@ -6,6 +6,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:tflite/tflite.dart';
+
+import 'package:background_fetch/background_fetch.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
@@ -49,6 +51,7 @@ class CarSides {
 }
 
 backup() async {
+  print("Backing up...");
   FLog.info(className: "Sides", methodName: "Backup", text: "Backing Up");
   var dir = await getExternalStorageDirectory();
   if (dir != null) {
@@ -79,6 +82,7 @@ backup() async {
       }
     });
   }
+  print("Backup done");
 }
 
 Future<List<CarSides>> predict(
