@@ -195,14 +195,16 @@ Future<bool> uploadImage(
     FLog.error(
         className: "Sides",
         methodName: "uploadImage",
-        text: "Server doesn't available");
+        text: "Server isn't available");
     return false;
   }
+  return false;
 }
 
 save(File image, CarSides predictedSide,
     CarSides realSide) async //Saves picture in phone
 {
+  print("saving image " + image.path);
   var now = DateTime.now();
   var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
   String currentTimeStamp = formatter.format(now);

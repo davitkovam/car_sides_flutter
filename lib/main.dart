@@ -322,6 +322,8 @@ class _MyHomePageState extends State<MyHomePage> {
           text: "realSide: $_realSide, predictedSide: $_predictedSide");
 
       // setState(() {});
+      /*await save(_imageFile!.file!, _predictedSide,
+          _realSide);*/
       var uploaded = false;
       uploaded = await uploadImage(_imageFile!.file!, _predictedSide,
           _realSide); //TODO: Finish upload function in sides.dart
