@@ -9,7 +9,6 @@ import 'package:intl/intl.dart';
 // import 'package:camera/camera.dart';
 import 'package:flutter_better_camera/camera.dart';
 import 'package:strings/strings.dart';
-import 'package:image/image.dart' as ImagePackage;
 import 'package:f_logs/f_logs.dart';
 
 import 'package:path_provider/path_provider.dart';
@@ -39,55 +38,6 @@ class CameraInterface {
     );
     initializeControllerFuture = controller.initialize();
   }
-}
-
-class Img {
-  File? file;
-  ImagePackage.Image? image;
-  String? size;
-  late Future _doneFuture;
-
-  String? path;
-
-  Img({this.path, this.file}) {
-    if (path != null) {
-      this.file = File(path!);
-    }
-    image = ImagePackage.decodeImage(file!.readAsBytesSync());
-    _doneFuture = init();
-  }
-
-  setPath(path) => this.path = path;
-
-  crop(int x, int y, int w, int h) async {
-    image = ImagePackage.copyCrop(image!, x, y, w, h);
-    File(path!).writeAsBytesSync(ImagePackage.encodeJpg(image!));
-    file = File(path!);
-    await init();
-  }
-
-  resize(int width, int height) async {
-    image = ImagePackage.copyResize(image!, width: width, height: height);
-    File(path!).writeAsBytesSync(ImagePackage.encodeJpg(image!));
-    file = File(path!);
-    await init();
-  }
-
-  Future init() async {
-    size = await getFileSize(file!, 2);
-  }
-
-  int get width => image!.width;
-
-  int get height => image!.height;
-
-  String get resolution => "$width" + "x" + "$height";
-
-  String toString() {
-    return resolution + " " + size!;
-  }
-
-  Future get initializationDone => _doneFuture;
 }
 
 //All functions are in sides.dart -> packages/sides/lib/sides.dart
@@ -183,96 +133,16 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 //Take a picture
   Future getImage() async {
-/*    print(_pictureScreen.cameraInterface.controller.flashMode);
-    FLog.info(
-        className: "MyHomePage",
-        methodName: "getImage",
-        text: "getImage() started");
-    try {
-      if (!_pictureScreen.cameraInterface.controller.value.isInitialized!) {
-        FLog.warning(
-            className: "MyHomePage",
-            methodName: "getImage",
-            text: "camera not initialized");
-        return;
-      } else {
-        FLog.info(
-            className: "MyHomePage",
-            methodName: "getImage",
-            text: "camera initialized");
-      }*/
       File f = await getImageFileFromAssets('car.jpg');
-      // await _pictureScreen.cameraInterface.initializeControllerFuture;
-      // XFile xImage =
-      //     await _pictureScreen.cameraInterface.controller.takePicture();
-/*      var cacheDir = await getTemporaryDirectory();
-
-        var now = DateTime.now();
-        var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
-        String currentTimeStamp = formatter.format(now);
-
-
-      var path = cacheDir.path + "/" + currentTimeStamp;*/
-      // var path = cacheDir.path + "/thumbnail.jpg";
-      // if (await File(path).exists()) {
-      //   print("file exist");
-      //   File(path).delete();
-      // }
-
-/*      try {
-        if (_pictureScreen.cameraInterface.controller.value.isTakingPicture!) {
-          FLog.warning(
-              className: "MyHomePage",
-              methodName: "getImage",
-              text: "camera is taking picture");
-          return;
-        }
-        await _pictureScreen.cameraInterface.controller.takePicture(path);
-      } catch (e) {
-        FLog.error(
-            className: "MyHomePage",
-            methodName: "getImage takePicture()",
-            text: "$e");
-      }*/
-
       _imageFile = Img(path: f.path);
       await _imageFile!.initializationDone;
-      // FLog.info(
-      //     className: "MyHomePage",
-      //     methodName: "getImage",
-      //     text: "image path: $path");
-      // var cacheDir = await getTemporaryDirectory();
-      // _croppedImage = _imageFile;
-      // _croppedImage!.setPath('${cacheDir.path}/thumbnail.jpg');
       FLog.info(
           className: "MyHomePage",
           methodName: "getImage",
           text: "image resolution: ${_imageFile!.resolution}");
-
-      // if (_imageFile!.width < _imageFile!.height) {
-      //   FLog.info(
-      //       className: "MyHomePage",
-      //       methodName: "getImage",
-      //       text: "height > width");
-      //   await _imageFile!.crop(0, (_imageFile!.height - _imageFile!.width) ~/ 2,
-      //       _imageFile!.width, _imageFile!.width);
-      // } else {
-      //   FLog.info(
-      //       className: "MyHomePage",
-      //       methodName: "getImage",
-      //       text: "width > height");
-      //   await _imageFile!.crop((_imageFile!.width - _imageFile!.height) ~/ 2, 0,
-      //       _imageFile!.height, _imageFile!.height);
-      // }
-      //
-      // FLog.info(
-      //     className: "MyHomePage",
-      //     methodName: "getImage",
-      //     text: "croppedImage resolution: ${_imageFile!.resolution}");
-      //
       // await _imageFile!.resize(240, 240);
 
-      _predictedSideList = await predict(_imageFile!.file!);
+      _predictedSideList = await predict(_imageFile!);
       _predictedSide = _predictedSideList![0];
 
       setState(() {
@@ -287,14 +157,14 @@ class _MyHomePageState extends State<MyHomePage> {
           text: "realSide: $_realSide, predictedSide: $_predictedSide");
 
       // setState(() {});
-      var uploaded = false;
-      uploaded = await uploadImage(_imageFile!.file!, _predictedSide,
-          _realSide); //TODO: Finish upload function in sides.dart
-      if (uploaded == false) {
-        await save(_imageFile!.file!, _predictedSide,
-            _realSide); //Saves image with correct naming
-      }
-      await backup();
+      // var uploaded = false;
+      // uploaded = await uploadImage(_imageFile!.file!, _predictedSide,
+      //     _realSide); //TODO: Finish upload function in sides.dart
+      // if (uploaded == false) {
+      //   await save(_imageFile!.file!, _predictedSide,
+      //       _realSide); //Saves image with correct naming
+      // }
+      // await backup();
 
       // File(path).delete();
     // } catch (e) {

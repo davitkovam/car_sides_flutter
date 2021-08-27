@@ -5,13 +5,66 @@ import 'dart:math';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:tflite/tflite.dart';
+
+// import 'package:tflite/tflite.dart';
+import 'package:tflite_flutter/tflite_flutter.dart' as tfl;
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:strings/strings.dart';
 import 'package:f_logs/f_logs.dart';
+import 'package:image/image.dart' as ImagePackage;
+import 'package:color/color.dart';
+
+class Img {
+  File? file;
+  ImagePackage.Image? image;
+  String? size;
+  late Future _doneFuture;
+
+  String? path;
+
+  Img({this.path, this.file}) {
+    if (path != null) {
+      this.file = File(path!);
+    }
+    image = ImagePackage.decodeImage(file!.readAsBytesSync());
+    _doneFuture = init();
+  }
+
+  setPath(path) => this.path = path;
+
+  crop(int x, int y, int w, int h) async {
+    image = ImagePackage.copyCrop(image!, x, y, w, h);
+    File(path!).writeAsBytesSync(ImagePackage.encodeJpg(image!));
+    file = File(path!);
+    await init();
+  }
+
+  resize(int width, int height) async {
+    image = ImagePackage.copyResize(image!, width: width, height: height);
+    File(path!).writeAsBytesSync(ImagePackage.encodeJpg(image!));
+    file = File(path!);
+    await init();
+  }
+
+  Future init() async {
+    size = await getFileSize(file!, 2);
+  }
+
+  int get width => image!.width;
+
+  int get height => image!.height;
+
+  String get resolution => "$width" + "x" + "$height";
+
+  String toString() {
+    return resolution + " " + size!;
+  }
+
+  Future get initializationDone => _doneFuture;
+}
 
 class CarSides {
   // final List<String> _sides = ['Front', 'Back', 'Left', 'Right', 'Diagonal'];
@@ -55,8 +108,7 @@ backup() async {
     FLog.info(
         className: "Sides", methodName: "Backup", text: "Directory: $dir");
     dir.list(recursive: false).forEach((f) async {
-      if (f.path.contains(".jpg"))
-      {
+      if (f.path.contains(".jpg")) {
         FLog.info(className: "Sides", methodName: "Backup", text: "f: $f");
         var pred = '${f.path.split("/")[f.path.split("/").length - 1][0]}'
             .toUpperCase();
@@ -82,35 +134,145 @@ backup() async {
   }
 }
 
-Future<List<CarSides>> predict(
-    File image) async //Predicts the image using the pretrained model
-{
-  await Tflite.loadModel(
-      model: "assets/model.tflite",
-      labels: "assets/labels.txt",
-      numThreads: 1,
-      isAsset: true,
-      useGpuDelegate: false);
+bytesToArray(ImagePackage.Image image) {
+  var bytes = image.getBytes();
+  // (256, 256, 3)
+  var outputList = [];
 
-  var recognitions = await Tflite.runModelOnImage(
-      path: image.path,
-      imageMean: 117.0,
-      imageStd: 1.0,
-      numResults: 5,
-      threshold: 0.1,
-      asynch: true);
-  FLog.info(
-      className: "Sides",
-      methodName: "Predict",
-      text: "Recognitions: $recognitions");
-  List<CarSides> carSidesList = [];
-  recognitions!.forEach((element) =>
-      carSidesList.add(CarSides(element['label'], element['confidence'])));
-  // var result = [
-  //   recognitions![0]['label'],
-  //   recognitions[0]['confidence']
+  for (var i = 0; i < image.height; i++) {
+    var tempList = [];
+    for (var j = 0; j < image.width; j++) {
+      var rgbList = [];
+      for (var k = 0; k < 3; k++) {
+        rgbList.add(bytes[i + (j * 4) + k]);
+      }
+      tempList.add(rgbList);
+    }
+    outputList.add(tempList);
+  }
+  // print(outputList);
+  return outputList;
+}
+
+moldInputs(List image) {
+// config.IMAGE_MIN_DIM 800
+// config.IMAGE_MIN_SCALE 0
+// config.IMAGE_MAX_DIM 1024
+// config.IMAGE_RESIZE_MODE square
+  resizeImage(image, minDim: 800, maxDim: 1024, minScale: 0, mode: 'square');
+}
+
+resizeImage(List image, {minDim, maxDim, minScale, mode = "square"}) {
+  print(image.shape);
+  var h = image.shape[0];
+  var w = image.shape[1];
+
+  var window = [0, 0, h, w];
+  var scale = 1;
+  var padding = [
+    [0, 0],
+    [0, 0],
+    [0, 0]
+  ];
+  var crop;
+
+  if (mode == "none") return [image, window, scale, padding, crop];
+
+  // Scale?
+  if (minDim)
+    // Scale up but not down
+    scale = max(1, minDim / min(h, w));
+  if (minScale && scale < minScale) scale = minScale;
+
+  // Does it exceed max dim?
+  var imageMax;
+  if (maxDim && mode == "square") {
+    imageMax = max(h, w);
+    if ((imageMax * scale).round() > maxDim) scale = maxDim / imageMax;
+  }
+
+  // Resize image using bilinear interpolation
+  // if(scale != 1)
+
+
+}
+
+predict(Img image) async //Predicts the image using the pretrained model
+{
+  final interpreter = await tfl.Interpreter.fromAsset('model.tflite');
+  print('image');
+  var byteList = bytesToArray(image.image!);
+  var newImage = image.resize(1024, 1024);
+  // moldInputs(byteList);
+
+  // var input0 = [];
+  // input0.add([]);
+  // for (var i = 0; i < 1024; i++) {
+  //   print('in for loop');
+  //   var tempX = [];
+  //   for (var j = 0; j < 1024; j++) {
+  //     tempX.add([0.0, 0.0, 0.0]);
+  //   }
+  //   input0[0].add(tempX);
+  // }
+  // print('input shape:');
+  // print(input0.shape);
+  //
+  // var input1 = [];
+  // input1.add([]);
+  // for (var i = 0; i < 93; i++) {
+  //   input1[0].add(0.0);
+  // }
+  // print(input1.shape);
+  //
+  // var input2 = [];
+  // input2.add([]);
+  // for (var i = 0; i < 261888; i++) {
+  //   input2[0].add([0.0, 0.0, 0.0, 0.0]);
+  // }
+  // print(input2.shape);
+  // // input: List<Object>
+  // var inputs = [input0, input1, input2];
+  //
+  // var output0 = [
+  //   List.filled(1000, [0.0, 0.0, 0.0, 0.0])
   // ];
-  return carSidesList;
+  // var output1 = [
+  //   List.filled(1000, List.filled(81, [0.0, 0.0, 0.0, 0.0]))
+  // ];
+  // var output2 = [List.filled(1000, List.filled(81, 0.0))];
+  // var output3 = [List.filled(100, List.filled(6, 0.0))];
+  // var output4 = [
+  //   List.filled(100, List.filled(28, List.filled(28, List.filled(81, 0.0))))
+  // ];
+  // var output5 = [List.filled(261888, List.filled(4, 0.0))];
+  // var output6 = [List.filled(261888, List.filled(2, 0.0))];
+  //
+  // print(output0.shape);
+  // print(output1.shape);
+  // print(output2.shape);
+  // print(output3.shape);
+  // print(output4.shape);
+  // print(output5.shape);
+  // print(output6.shape);
+  //
+  // // output: Map<int, Object>
+  // var outputs = {
+  //   0: output0,
+  //   1: output1,
+  //   2: output2,
+  //   3: output3,
+  //   4: output4,
+  //   5: output5,
+  //   6: output6
+  // };
+  //
+  // // inference
+  // print('start inference');
+  // interpreter.runForMultipleInputs(inputs, outputs);
+  // print('end inference');
+  // // print outputs
+  // print(outputs);
 }
 
 Future<bool> internetAvailable() async {

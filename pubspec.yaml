@@ -28,7 +28,6 @@ dependencies:
   sides:
     path: packages/sides
 #  camera: ^0.8.1+3
-  image: ^3.0.2
   persistent_bottom_nav_bar: ^4.0.2
 #  f_logs: ^2.0.0
   f_logs:
