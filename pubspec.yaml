@@ -60,6 +60,7 @@ flutter:
     - assets/labels.txt
     - assets/model.tflite
     - assets/car.jpg
+    - assets/face.jpg
 
 
   # The following line ensures that the Material Icons font is

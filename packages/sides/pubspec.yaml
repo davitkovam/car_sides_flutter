@@ -21,7 +21,7 @@ dependencies:
     git:
       url: git://github.com/draganjovanovic1/Flogs
   image: ^3.0.2
-  color: any
+  matrix2d: ^1.0.0
 
 
 

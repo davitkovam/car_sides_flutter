@@ -133,7 +133,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 //Take a picture
   Future getImage() async {
-      File f = await getImageFileFromAssets('car.jpg');
+      File f = await getImageFileFromAssets('face.jpg');
       _imageFile = Img(path: f.path);
       await _imageFile!.initializationDone;
       FLog.info(

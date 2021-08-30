@@ -50,13 +50,6 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "1.15.0"
-  color:
-    dependency: "direct main"
-    description:
-      name: color
-      url: "https://pub.dartlang.org"
-    source: hosted
-    version: "3.0.0"
   crypto:
     dependency: transitive
     description:
@@ -146,6 +139,13 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "0.12.10"
+  matrix2d:
+    dependency: "direct main"
+    description:
+      name: matrix2d
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "1.0.0"
   meta:
     dependency: transitive
     description:

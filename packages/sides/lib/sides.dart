@@ -15,7 +15,7 @@ import 'package:http_parser/http_parser.dart';
 import 'package:strings/strings.dart';
 import 'package:f_logs/f_logs.dart';
 import 'package:image/image.dart' as ImagePackage;
-import 'package:color/color.dart';
+import 'dart:math';
 
 class Img {
   File? file;
@@ -154,16 +154,57 @@ bytesToArray(ImagePackage.Image image) {
   return outputList;
 }
 
+moldImage(List image) {
+  // MEAN_PIXEL                     [123.7 116.8 103.9]
+  var meanPixel = [123.7, 116.8, 103.9];
+  for (int i = 0; i < image.length; i++) {
+    for (int j = 0; j < image[i].length; j++)
+      for (int k = 0; k < 3; k++) image[i][j][k] -= meanPixel[k];
+  }
+  return image;
+}
+
+composeImageMeta(
+    imageId, originalImageShape, imageShape, window, scale, activeClassIds) {
+  var meta = [imageId] +
+      originalImageShape +
+      imageShape +
+      window +
+      [scale] +
+      activeClassIds;
+  meta = List.generate(meta.length, (i) => meta[i].toDouble());
+  return meta;
+}
+
 moldInputs(List image) {
 // config.IMAGE_MIN_DIM 800
 // config.IMAGE_MIN_SCALE 0
 // config.IMAGE_MAX_DIM 1024
 // config.IMAGE_RESIZE_MODE square
-  resizeImage(image, minDim: 800, maxDim: 1024, minScale: 0, mode: 'square');
+  var resizeOutput = resizeImage(image,
+      minDim: 800, maxDim: 1024, minScale: 0, mode: 'square');
+  List moldedImage = resizeOutput[0];
+  var window = resizeOutput[1];
+  var scale = resizeOutput[2];
+  var padding = resizeOutput[3];
+  var crop = resizeOutput[4];
+
+  var zerosList = [];
+  for (int i = 0; i < 81; i++) {
+    zerosList.add(0);
+  }
+
+  moldedImage = moldImage(moldedImage);
+  List imageMeta = composeImageMeta(
+      0, image.shape, moldedImage.shape, window, scale, zerosList);
+  return [
+    [moldedImage],
+    [imageMeta],
+    [window]
+  ];
 }
 
 resizeImage(List image, {minDim, maxDim, minScale, mode = "square"}) {
-  print(image.shape);
   var h = image.shape[0];
   var w = image.shape[1];
 
@@ -179,32 +220,224 @@ resizeImage(List image, {minDim, maxDim, minScale, mode = "square"}) {
   if (mode == "none") return [image, window, scale, padding, crop];
 
   // Scale?
-  if (minDim)
-    // Scale up but not down
-    scale = max(1, minDim / min(h, w));
-  if (minScale && scale < minScale) scale = minScale;
+  // if (minDim != null)
+  //   // Scale up but not down
+  //   scale = max(1, minDim / min(h, w));
+  // if (minScale != null && scale < minScale) scale = minScale;
 
   // Does it exceed max dim?
-  var imageMax;
-  if (maxDim && mode == "square") {
-    imageMax = max(h, w);
-    if ((imageMax * scale).round() > maxDim) scale = maxDim / imageMax;
+  // var imageMax;
+  // if (maxDim != null && mode == "square") {
+  //   imageMax = max(h, w);
+  //   if ((imageMax * scale) > maxDim) scale = maxDim / imageMax;
+  // }
+  //
+  // if(mode == "square")
+  //   {
+  //     var topPad = (maxDim - h) ~/ 2;
+  //     var bottomPad = maxDim - h - topPad;
+  //     var leftPad = (maxDim - w) ~/ 2;
+  //     var rightPad = maxDim - w - leftPad;
+  //     padding = [[topPad, bottomPad], [leftPad, rightPad], [0, 0]];
+  //   }
+  return [image, window, scale, padding, crop];
+}
+
+computeBackboneShapes(List imageShape, backboneStrides) {
+  List output = [];
+  for (var value in backboneStrides) {
+    output
+        .add([(imageShape[0] / value).ceil(), (imageShape[1] / value).ceil()]);
   }
+  return output;
+}
 
-  // Resize image using bilinear interpolation
-  // if(scale != 1)
+generateAnchors(scales, ratios, shape, featureStride, int anchorStride) {
+  scales = List.generate(ratios.length, (index) => scales);
 
+  var heights = List.generate(
+      ratios.length, (index) => scales[index] / sqrt(ratios[index]));
+  var widths = List.generate(
+      ratios.length, (index) => scales[index] * sqrt(ratios[index]));
+  var shiftsY = [];
+  for (var i = 0; i < shape[0]; i += anchorStride) {
+    shiftsY.add(i * featureStride);
+  }
+  var shiftsX = [];
+  for (var i = 0; i < shape[1]; i += anchorStride) {
+    shiftsX.add(i * featureStride);
+  }
+  var meshGridOut = meshGrid(shiftsX, shiftsY);
+  shiftsX = meshGridOut[0];
+  shiftsY = meshGridOut[1];
+  var meshGridOutX = meshGrid(widths, shiftsX);
+  List boxWidths = meshGridOutX[0];
+  List boxCentersX = meshGridOutX[1];
 
+  var meshGridOutY = meshGrid(heights, shiftsY);
+  List boxHeights = meshGridOutY[0];
+  List boxCentersY = meshGridOutY[1];
+
+  List boxCenters = stackAxis2(boxCentersY, boxCentersX);
+  List boxSizes = stackAxis2(boxHeights, boxWidths);
+  var boxes = concatenateAxis1(boxCenters, boxSizes);
+  return boxes;
+}
+
+concatenateAxis1(List x, List y) {
+  var output = [];
+  for (var i = 0; i < x.length; i++) {
+    var temp = [];
+    for (var j = 0; j < x[i].length; j++) {
+      temp.add(x[i][j] - 0.5 * y[i][j]);
+    }
+    for (var j = 0; j < x[i].length; j++) {
+      temp.add(x[i][j] + 0.5 * y[i][j]);
+    }
+    output.add(temp);
+  }
+  return output;
+}
+
+stackAxis2(List x, List y) {
+  List output = [];
+  for (var i = 0; i < x.length; i++) {
+    for (var j = 0; j < x[i].length; j++) output.add([x[i][j], y[i][j]]);
+  }
+  return output;
+}
+
+meshGrid(List x, List y) {
+  var outputX = [];
+  var outputY = [];
+
+  var flattenX = [];
+  if (x[0] is List)
+    x.forEach((e) {
+      flattenX.addAll(e);
+    });
+  else
+    flattenX = x;
+
+  var flattenY = [];
+  if (y[0] is List)
+    y.forEach((e) {
+      flattenY.addAll(e);
+    });
+  else
+    flattenY = y;
+
+  for (var i = 0; i < flattenY.length; i++) {
+    var tempX = [];
+    var tempY = [];
+    for (var j = 0; j < flattenX.length; j++) {
+      tempX.add(flattenX[j]);
+      tempY.add(flattenY[i]);
+    }
+    outputX.add(tempX);
+    outputY.add(tempY);
+  }
+  return [outputX, outputY];
+}
+
+generatePyramidAnchors(
+    List scales, ratios, featureShapes, featureStrides, int anchorStride) {
+  var anchors = [];
+  for (var i = 0; i < scales.length; i++) {
+    anchors.add(generateAnchors(
+        scales[i], ratios, featureShapes[i], featureStrides[i], anchorStride));
+  }
+  var pyramidAnchors = [];
+  for (var i in anchors) {
+    pyramidAnchors.addAll(i);
+  }
+  return pyramidAnchors;
+}
+
+getAnchors(List imageShape) {
+  var RPN_ANCHOR_SCALES = [32, 64, 128, 256, 512];
+  var RPN_ANCHOR_RATIOS = [0.5, 1, 2];
+  var BACKBONE_STRIDES = [4, 8, 16, 32, 64];
+  var RPN_ANCHOR_STRIDE = 1;
+
+  var backboneShapes = computeBackboneShapes(imageShape, BACKBONE_STRIDES);
+  var anchorCache = {};
+  var anchors = generatePyramidAnchors(RPN_ANCHOR_SCALES, RPN_ANCHOR_RATIOS,
+      backboneShapes, BACKBONE_STRIDES, RPN_ANCHOR_STRIDE);
+  // TODO: make as global var
+  anchorCache[imageShape] = normBoxes(anchors, [imageShape[0], imageShape[1]]);
+  return anchorCache[imageShape];
+}
+
+normBoxes(boxes, shape) {
+  var h = shape[0];
+  var w = shape[1];
+  var scale = [h - 1, w - 1, h - 1, w - 1];
+  var shift = [0, 0, 1, 1];
+
+  var output = [];
+  for (var box in boxes) {
+    var temp = [];
+    for (var i = 0; i < box.length; i++) {
+      temp.add((box[i] - shift[i]) / scale[i]);
+    }
+    output.add(temp);
+  }
+  return output;
 }
 
 predict(Img image) async //Predicts the image using the pretrained model
 {
   final interpreter = await tfl.Interpreter.fromAsset('model.tflite');
-  print('image');
   var byteList = bytesToArray(image.image!);
-  var newImage = image.resize(1024, 1024);
-  // moldInputs(byteList);
 
+  var moldOutput = moldInputs(byteList);
+  List<List> moldedImages = moldOutput[0];
+  List imageMetas = moldOutput[1];
+  List windows = moldOutput[2];
+
+  var anchors = [getAnchors(moldedImages[0].shape)];
+  print('${moldedImages.shape} ${imageMetas.shape}, ${anchors.shape}');
+  print(moldedImages);
+  print(imageMetas);
+  print(anchors);
+  var inputs = [moldedImages, imageMetas, anchors];
+
+  var outputs = {
+    0: [
+      List.filled(1000, [0.0, 0.0, 0.0, 0.0])
+    ],
+    1: [
+      List.filled(1000, List.filled(81, [0.0, 0.0, 0.0, 0.0]))
+    ],
+    2: [List.filled(1000, List.filled(81, 0.0))],
+    3: [List.filled(100, List.filled(6, 0.0))],
+    4: [
+      List.filled(100, List.filled(28, List.filled(28, List.filled(81, 0.0))))
+    ],
+    5: [List.filled(261888, List.filled(4, 0.0))],
+    6: [List.filled(261888, List.filled(2, 0.0))]
+  };
+  print('start inference');
+  interpreter.runForMultipleInputs(inputs, outputs);
+  print('end inference');
+  for(var i = 0; i < 7; i++)
+    {
+      print(outputs[i]);
+    }
+  // print(outputs[0]);
+/*  for(var out in outputs[3]![0])
+    {
+      for(var num in out)
+        {
+          if(num != 0.0)
+            {
+              print(out);
+            }
+        }
+    }
+  print(outputs[3]);
+  print(outputs[4]);*/
   // var input0 = [];
   // input0.add([]);
   // for (var i = 0; i < 1024; i++) {
