@@ -4,47 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import 'package:sides/sides.dart';
-import 'package:intl/intl.dart';
-
-// import 'package:camera/camera.dart';
-import 'package:flutter_better_camera/camera.dart';
 import 'package:strings/strings.dart';
 import 'package:f_logs/f_logs.dart';
-
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/services.dart' show rootBundle;
-//Possible classes
-
-class CameraInterface {
-  late CameraController controller;
-  late Future<void> initializeControllerFuture;
-  late bool cameraStarted = false;
-
-  static late final List<CameraDescription> cameras;
-
-  static camerasInitialize() async {
-    WidgetsFlutterBinding.ensureInitialized();
-    cameras = await availableCameras();
-  }
-
-  controllerInitialize(camera, ResolutionPreset res) {
-    cameraStarted = true;
-    controller = CameraController(
-      camera,
-      res,
-      enableAudio: false,
-      flashMode: FlashMode.off,
-      // imageFormatGroup: ImageFormatGroup.yuv420,
-    );
-    initializeControllerFuture = controller.initialize();
-  }
-}
+import 'package:image/image.dart' as ImagePackage;
+import 'dart:typed_data';
 
 //All functions are in sides.dart -> packages/sides/lib/sides.dart
 
 Future<void> main() async {
-  await CameraInterface.camerasInitialize();
-  await CarSides.loadAsset();
+  // await CameraInterface.camerasInitialize();
+  // await CarSides.loadAsset();
   // FLog.printLogs();
   runApp(
     MultiProvider(
@@ -107,16 +78,8 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  Img? _imageFile;
-
-  // Img? _croppedImage;
-  List<CarSides>? _predictedSideList;
-  late CarSides _predictedSide;
-  late CarSides _realSide;
-
-  late ImagePreviewPage _pictureScreen =
-      new ImagePreviewPage(CameraInterface.cameras.first);
-
+  String? filename;
+  String imageName = 'car_1024_1024.jpg';
   int _selectedIndex = 0;
   PageController pageController = PageController(
     initialPage: 0,
@@ -127,49 +90,23 @@ class _MyHomePageState extends State<MyHomePage> {
     final byteData = await rootBundle.load('assets/$path');
 
     final file = File('${(await getTemporaryDirectory()).path}/$path');
-    await file.writeAsBytes(byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
+    await file.writeAsBytes(byteData.buffer
+        .asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
 
     return file;
   }
+
 //Take a picture
   Future getImage() async {
-      File f = await getImageFileFromAssets('face.jpg');
-      _imageFile = Img(path: f.path);
-      await _imageFile!.initializationDone;
-      FLog.info(
-          className: "MyHomePage",
-          methodName: "getImage",
-          text: "image resolution: ${_imageFile!.resolution}");
-      // await _imageFile!.resize(240, 240);
-
-      _predictedSideList = await predict(_imageFile!);
-      _predictedSide = _predictedSideList![0];
-
-      setState(() {
-        _onItemTapped(1);
-      });
-      _realSide = await _showSingleChoiceDialog(context);
-      print("RealSide: " + _realSide.label);
-
-      FLog.info(
-          className: "MyHomePage",
-          methodName: "getImage",
-          text: "realSide: $_realSide, predictedSide: $_predictedSide");
-
-      // setState(() {});
-      // var uploaded = false;
-      // uploaded = await uploadImage(_imageFile!.file!, _predictedSide,
-      //     _realSide); //TODO: Finish upload function in sides.dart
-      // if (uploaded == false) {
-      //   await save(_imageFile!.file!, _predictedSide,
-      //       _realSide); //Saves image with correct naming
-      // }
-      // await backup();
-
-      // File(path).delete();
-    // } catch (e) {
-    //   FLog.error(className: "MyHomePage", methodName: "getImage", text: "$e");
-    // }
+    print('getImage');
+    ByteData imageData = await rootBundle.load('assets/car_1024_1024.jpg');
+    List<int> bytes = Uint8List.view(imageData.buffer);
+    ImagePackage.Image image = ImagePackage.decodeImage(bytes)!;
+    // var image = ImagePackage.decodeJpg((await getImageFileFromAssets(imageName)).readAsBytesSync());
+    filename = await predict(image);
+    setState(() {
+      _onItemTapped(1);
+    });
   }
 
   @override
@@ -208,8 +145,8 @@ class _MyHomePageState extends State<MyHomePage> {
       physics: NeverScrollableScrollPhysics(),
       onPageChanged: _pageChanged,
       children: <Widget>[
-        _pictureScreen,
-        ImageInfoPage(_imageFile, _predictedSideList),
+        Image(image: AssetImage('assets/$imageName')),
+        MrcnnPage(filename),
         LogPage()
       ],
     );
@@ -257,144 +194,6 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
-class ImagePreviewPage extends StatefulWidget {
-  final CameraDescription? camera;
-  final CameraInterface cameraInterface = new CameraInterface();
-
-  ImagePreviewPage(this.camera, {Key? key}) : super(key: key);
-
-  controllerInitialize(ResolutionPreset res) =>
-      cameraInterface.controllerInitialize(camera, res);
-
-  @override
-  ImagePreviewPageState createState() => ImagePreviewPageState();
-}
-
-class ImagePreviewPageState extends State<ImagePreviewPage>
-    with WidgetsBindingObserver {
-  ResolutionPreset resolution = ResolutionPreset.high;
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    FLog.info(
-        className: "TakePictureScreenState",
-        methodName: "AppState",
-        text: "state changed to: $state");
-    // FLog.info(className: "TakePictureScreenState", methodName: "AppState", text: "cameraStarted: ${widget.cameraInterface.cameraStarted}");
-    if (!widget.cameraInterface.controller.value.isInitialized!) {
-      FLog.info(
-          className: "TakePictureScreenState",
-          methodName: "AppState",
-          text: "Controller not initialized");
-      return;
-    }
-    if (state == AppLifecycleState.inactive) {
-      FLog.info(
-          className: "TakePictureScreenState",
-          methodName: "AppState",
-          text: "Dispose camera");
-      widget.cameraInterface.controller.dispose();
-    } else if (state == AppLifecycleState.resumed) {
-      FLog.info(
-          className: "TakePictureScreenState",
-          methodName: "AppState",
-          text: "Initialize camera");
-      widget.controllerInitialize(resolution);
-      widget.cameraInterface.initializeControllerFuture
-          .then((value) => setState(() {}));
-    }
-
-    // if (!widget.cameraInterface.cameraStarted &&
-    //     state == AppLifecycleState.resumed) {
-    //   widget.controllerInitialize(resolution);
-    //   FLog.info(
-    //       className: "TakePictureScreenState",
-    //       methodName: "AppState",
-    //       text: "Initialize camera");
-    //   widget.cameraInterface.cameraStarted = true;
-    //   widget.cameraInterface.initializeControllerFuture
-    //       .then((value) => setState(() {}));
-    // } else if (widget.cameraInterface.cameraStarted) {
-    //   FLog.info(
-    //       className: "TakePictureScreenState",
-    //       methodName: "AppState",
-    //       text: "Dispose camera");
-    //   widget.cameraInterface.controller.dispose();
-    //   widget.cameraInterface.cameraStarted = false;
-    // }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    // To display the current output from the Camera,
-    // create a CameraController.
-    WidgetsBinding.instance!.addObserver(this);
-  }
-
-  @override
-  void dispose() {
-    // Dispose of the controller when the widget is disposed.
-    // widget.cameraInterface.controller.dispose();
-    // widget.cameraInterface.cameraStarted = false;
-    WidgetsBinding.instance!.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final height = MediaQuery.of(context).size.height;
-    if (!widget.cameraInterface.cameraStarted) {
-      if (width <= 365 && height < 600) {
-        resolution = ResolutionPreset.medium;
-        FLog.info(
-            className: "TakePictureScreenState",
-            methodName: "Build",
-            text: "Camera resolution changed: $resolution");
-      }
-      widget.controllerInitialize(resolution);
-    }
-
-    return Container(
-      color: Colors.black,
-      child: FutureBuilder<void>(
-        future: widget.cameraInterface.initializeControllerFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.done) {
-            try {
-              return Stack(alignment: FractionalOffset.center, children: [
-                Positioned.fill(
-                    child: AspectRatio(
-                        aspectRatio:
-                            widget.cameraInterface.controller.value.aspectRatio,
-                        child:
-                            CameraPreview(widget.cameraInterface.controller))),
-                Container(
-                  width: width,
-                  height: width,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.greenAccent, width: 4),
-                  ),
-                ),
-              ]);
-            } catch (e) {
-              FLog.error(
-                  className: "TakePictureScreenState",
-                  methodName: "Build",
-                  text: "$e");
-              return const Center(child: CircularProgressIndicator());
-            }
-          } else {
-            // Otherwise, display a loading indicator.
-            return const Center(child: CircularProgressIndicator());
-          }
-        },
-      ),
-    );
-  }
-}
-
 class SingleNotifier extends ChangeNotifier {
   late String _currentSide;
 
@@ -417,55 +216,18 @@ class SingleNotifier extends ChangeNotifier {
 }
 
 //Dialogue to ask for the real side
-Future<CarSides> _showSingleChoiceDialog(BuildContext context) {
-  SingleNotifier _singleNotifier = new SingleNotifier();
-  final completer = new Completer<CarSides>();
-  showDialog(
-      context: context,
-      builder: (context) {
-        _singleNotifier = Provider.of<SingleNotifier>(context);
-        return WillPopScope(
-          onWillPop: () async => false,
-          child: AlertDialog(
-            title: Text("Select the real side!"),
-            content: SingleChildScrollView(
-              child: Container(
-                width: double.infinity,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: CarSides.sides
-                      .map(
-                        (e) => RadioListTile(
-                          title: Text(capitalize(e)),
-                          value: e,
-                          groupValue: _singleNotifier.currentSide,
-                          selected: _singleNotifier.currentSide == e,
-                          onChanged: (value) {
-                            print(e);
-                            if (value != _singleNotifier.currentSide) {
-                              _singleNotifier.updateSide(value);
-                            }
-                          },
-                        ),
-                      )
-                      .toList(),
-                ),
-              ),
-            ),
-            actions: <Widget>[
-              new TextButton(
-                child: new Text("OK"),
-                onPressed: () {
-                  completer.complete(CarSides(_singleNotifier._currentSide));
-                  Navigator.of(context).pop();
-                  _singleNotifier.resetSide();
-                },
-              )
-            ],
-          ),
-        );
-      });
-  return completer.future;
+
+class MrcnnPage extends StatelessWidget {
+  final String? filename;
+
+  const MrcnnPage(this.filename, {Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      child: filename == null ? null : Image.file(File(filename!)),
+    );
+  }
 }
 
 class ImageInfoPage extends StatelessWidget {
@@ -595,8 +357,12 @@ class _LogPageState extends State<LogPage> {
                   });
                 }
               },
-              items: [LogLevel.ALL, LogLevel.INFO, LogLevel.ERROR, LogLevel.WARNING]
-                  .map((LogLevel value) {
+              items: [
+                LogLevel.ALL,
+                LogLevel.INFO,
+                LogLevel.ERROR,
+                LogLevel.WARNING
+              ].map((LogLevel value) {
                 return DropdownMenuItem(
                   value: value,
                   child: Text(value.toString()),

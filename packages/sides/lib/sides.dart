@@ -2,12 +2,11 @@ library sides;
 
 import 'dart:io';
 import 'dart:math';
-import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
-
-// import 'package:tflite/tflite.dart';
 import 'package:tflite_flutter/tflite_flutter.dart' as tfl;
+import 'package:tflite_flutter_helper/tflite_flutter_helper.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
@@ -15,7 +14,6 @@ import 'package:http_parser/http_parser.dart';
 import 'package:strings/strings.dart';
 import 'package:f_logs/f_logs.dart';
 import 'package:image/image.dart' as ImagePackage;
-import 'dart:math';
 
 class Img {
   File? file;
@@ -26,9 +24,7 @@ class Img {
   String? path;
 
   Img({this.path, this.file}) {
-    if (path != null) {
-      this.file = File(path!);
-    }
+    if (path != null) this.file = File(path!);
     image = ImagePackage.decodeImage(file!.readAsBytesSync());
     _doneFuture = init();
   }
@@ -59,9 +55,7 @@ class Img {
 
   String get resolution => "$width" + "x" + "$height";
 
-  String toString() {
-    return resolution + " " + size!;
-  }
+  String toString() => resolution + " " + size!;
 
   Future get initializationDone => _doneFuture;
 }
@@ -88,17 +82,152 @@ class CarSides {
     sides = (await rootBundle.loadString('assets/labels.txt')).split("\n");
   }
 
-  firstLetter() {
-    return capitalize(label[0]);
-  }
+  firstLetter() => capitalize(label[0]);
 
-  String toString() {
-    return capitalize(label) + ' ' + confidenceToPercent();
-  }
+  String toString() => capitalize(label) + ' ' + confidenceToPercent();
 
-  String confidenceToPercent() {
-    return "${(confidence * 100).round()}%";
-  }
+  String confidenceToPercent() => "${(confidence * 100).round()}%";
+}
+
+class CocoConfig {
+  static const String BACKBONE = 'resnet101';
+  static const List<int> BACKBONE_STRIDES = [4, 8, 16, 32, 64];
+  static const int BATCH_SIZE = 1;
+  static const List<double> BBOX_STD_DEV = [0.1, 0.1, 0.2, 0.2];
+
+  // static COMPUTE_BACKBONE_SHAPE = None;
+  static const int DETECTION_MAX_INSTANCES = 100;
+  static const double DETECTION_MIN_CONFIDENCE = 0.7;
+  static const double DETECTION_NMS_THRESHOLD = 0.3;
+  static const int FPN_CLASSIF_FC_LAYERS_SIZ = 1024;
+  static const int GPU_COUNT = 1;
+  static const double GRADIENT_CLIP_NORM = 5.0;
+  static const int IMAGES_PER_GPU = 1;
+  static const int IMAGE_CHANNEL_COUNT = 3;
+  static const int IMAGE_MAX_DIM = 1024;
+  static const int IMAGE_META_SIZE = 93;
+  static const int IMAGE_MIN_DIM = 800;
+  static const int IMAGE_MIN_SCALE = 0;
+  static const String IMAGE_RESIZE_MODE = 'square';
+  static const List<int> IMAGE_SHAPE = [1024, 1024, 3];
+  static const double LEARNING_MOMENTUM = 0.9;
+  static const double LEARNING_RATE = 0.001;
+  static const Map<String, double> LOSS_WEIGHTS = {
+    'rpn_class_loss': 1.0,
+    'rpn_bbox_loss': 1.0,
+    'mrcnn_class_loss': 1.0,
+    'mrcnn_bbox_loss': 1.0,
+    'mrcnn_mask_loss': 1.0
+  };
+  static const int MASK_POOL_SIZE = 14;
+  static const List<int> MASK_SHAPE = [28, 28];
+  static const int MAX_GT_INSTANCES = 100;
+  static const List<double> MEAN_PIXEL = [123.7, 116.8, 103.9];
+  static const List<int> MINI_MASK_SHAPE = [56, 56];
+  static const String NAME = 'coco';
+  static const int NUM_CLASSES = 81;
+  static const int POOL_SIZE = 7;
+  static const int POST_NMS_ROIS_INFERENCE = 1000;
+  static const int POST_NMS_ROIS_TRAINING = 2000;
+  static const int PRE_NMS_LIMIT = 6000;
+  static const double ROI_POSITIVE_RATIO = 0.33;
+  static const List<double> RPN_ANCHOR_RATIOS = [0.5, 1, 2];
+  static const List<double> RPN_ANCHOR_SCALES = [32, 64, 128, 256, 512];
+  static const int RPN_ANCHOR_STRIDE = 1;
+  static const List<double> RPN_BBOX_STD_DEV = [0.1, 0.1, 0.2, 0.2];
+  static const double RPN_NMS_THRESHOLD = 0.7;
+  static const int RPN_TRAIN_ANCHORS_PER_IMAGE = 256;
+  static const int STEPS_PER_EPOCH = 1000;
+  static const int TOP_DOWN_PYRAMID_SIZE = 256;
+  static const bool TRAIN_BN = false;
+  static const int TRAIN_ROIS_PER_IMAGE = 200;
+  static const bool USE_MINI_MASK = true;
+  static const bool USE_RPN_ROIS = true;
+  static const int VALIDATION_STEPS = 50;
+  static const double WEIGHT_DECAY = 0.0001;
+  static const List classNames = [
+    'BG',
+    'person',
+    'bicycle',
+    'car',
+    'motorcycle',
+    'airplane',
+    'bus',
+    'train',
+    'truck',
+    'boat',
+    'traffic light',
+    'fire hydrant',
+    'stop sign',
+    'parking meter',
+    'bench',
+    'bird',
+    'cat',
+    'dog',
+    'horse',
+    'sheep',
+    'cow',
+    'elephant',
+    'bear',
+    'zebra',
+    'giraffe',
+    'backpack',
+    'umbrella',
+    'handbag',
+    'tie',
+    'suitcase',
+    'frisbee',
+    'skis',
+    'snowboard',
+    'sports ball',
+    'kite',
+    'baseball bat',
+    'baseball glove',
+    'skateboard',
+    'surfboard',
+    'tennis racket',
+    'bottle',
+    'wine glass',
+    'cup',
+    'fork',
+    'knife',
+    'spoon',
+    'bowl',
+    'banana',
+    'apple',
+    'sandwich',
+    'orange',
+    'broccoli',
+    'carrot',
+    'hot dog',
+    'pizza',
+    'donut',
+    'cake',
+    'chair',
+    'couch',
+    'potted plant',
+    'bed',
+    'dining table',
+    'toilet',
+    'tv',
+    'laptop',
+    'mouse',
+    'remote',
+    'keyboard',
+    'cell phone',
+    'microwave',
+    'oven',
+    'toaster',
+    'sink',
+    'refrigerator',
+    'book',
+    'clock',
+    'vase',
+    'scissors',
+    'teddy bear',
+    'hair drier',
+    'toothbrush'
+  ];
 }
 
 backup() async {
@@ -135,68 +264,34 @@ backup() async {
 }
 
 bytesToArray(ImagePackage.Image image) {
-  var bytes = image.getBytes();
-  // (256, 256, 3)
-  var outputList = [];
-
-  for (var i = 0; i < image.height; i++) {
-    var tempList = [];
-    for (var j = 0; j < image.width; j++) {
-      var rgbList = [];
-      for (var k = 0; k < 3; k++) {
-        rgbList.add(bytes[i + (j * 4) + k]);
-      }
-      tempList.add(rgbList);
-    }
-    outputList.add(tempList);
-  }
-  // print(outputList);
-  return outputList;
-}
-
-moldImage(List image) {
-  // MEAN_PIXEL                     [123.7 116.8 103.9]
-  var meanPixel = [123.7, 116.8, 103.9];
-  for (int i = 0; i < image.length; i++) {
-    for (int j = 0; j < image[i].length; j++)
-      for (int k = 0; k < 3; k++) image[i][j][k] -= meanPixel[k];
-  }
-  return image;
-}
-
-composeImageMeta(
-    imageId, originalImageShape, imageShape, window, scale, activeClassIds) {
-  var meta = [imageId] +
-      originalImageShape +
-      imageShape +
-      window +
-      [scale] +
-      activeClassIds;
-  meta = List.generate(meta.length, (i) => meta[i].toDouble());
-  return meta;
+  List rgbImage = image.getBytes(format: ImagePackage.Format.rgb);
+  // rgbImage = List.generate(rgbImage.length, (i) => rgbImage[i].toDouble());
+  rgbImage = rgbImage.reshape([image.height, image.width, 3]);
+  return rgbImage;
 }
 
 moldInputs(List image) {
-// config.IMAGE_MIN_DIM 800
-// config.IMAGE_MIN_SCALE 0
-// config.IMAGE_MAX_DIM 1024
-// config.IMAGE_RESIZE_MODE square
   var resizeOutput = resizeImage(image,
-      minDim: 800, maxDim: 1024, minScale: 0, mode: 'square');
+      minDim: CocoConfig.IMAGE_MIN_DIM,
+      maxDim: CocoConfig.IMAGE_MAX_DIM,
+      minScale: CocoConfig.IMAGE_MIN_SCALE,
+      mode: CocoConfig.IMAGE_RESIZE_MODE);
   List moldedImage = resizeOutput[0];
   var window = resizeOutput[1];
   var scale = resizeOutput[2];
-  var padding = resizeOutput[3];
-  var crop = resizeOutput[4];
-
-  var zerosList = [];
-  for (int i = 0; i < 81; i++) {
-    zerosList.add(0);
-  }
-
+  // var padding = resizeOutput[3];
+  // var crop = resizeOutput[4];
+  print('originalImage before');
+  print(image);
   moldedImage = moldImage(moldedImage);
+  print('originalImage after');
+  print(image);
+  print('moldedImage');
+  print(moldedImage);
+  var zerosList = List.filled(CocoConfig.NUM_CLASSES, 0);
   List imageMeta = composeImageMeta(
       0, image.shape, moldedImage.shape, window, scale, zerosList);
+  print(image);
   return [
     [moldedImage],
     [imageMeta],
@@ -218,7 +313,7 @@ resizeImage(List image, {minDim, maxDim, minScale, mode = "square"}) {
   var crop;
 
   if (mode == "none") return [image, window, scale, padding, crop];
-
+  // TODO: resize
   // Scale?
   // if (minDim != null)
   //   // Scale up but not down
@@ -243,22 +338,81 @@ resizeImage(List image, {minDim, maxDim, minScale, mode = "square"}) {
   return [image, window, scale, padding, crop];
 }
 
-computeBackboneShapes(List imageShape, backboneStrides) {
+moldImage(image) {
+  for (int i = 0; i < image.length; i++)
+    for (int j = 0; j < image[i].length; j++)
+      for (int k = 0; k < 3; k++) image[i][j][k] -= CocoConfig.MEAN_PIXEL[k];
+
+  return image;
+}
+
+composeImageMeta(
+    imageId, originalImageShape, imageShape, window, scale, activeClassIds) {
+  var meta = [imageId] +
+      originalImageShape +
+      imageShape +
+      window +
+      [scale] +
+      activeClassIds;
+  meta = List.generate(meta.length, (i) => meta[i].toDouble());
+  return meta;
+}
+
+getAnchors(List imageShape) async {
+  Directory appDocumentsDirectory = await getApplicationDocumentsDirectory();
+  String appDocumentsPath = appDocumentsDirectory.path;
+
+  var filename = '$appDocumentsPath/anchors';
+  for (var shape in imageShape) filename += '_$shape';
+  filename += '.json';
+  if (await File(filename).exists()) {
+    print('Anchors exist');
+    return jsonDecode(await File(filename).readAsString());
+  }
+
+  var backboneShapes =
+      computeBackboneShapes(imageShape, CocoConfig.BACKBONE_STRIDES);
+  var anchors = generatePyramidAnchors(
+      CocoConfig.RPN_ANCHOR_SCALES,
+      CocoConfig.RPN_ANCHOR_RATIOS,
+      backboneShapes,
+      CocoConfig.BACKBONE_STRIDES,
+      CocoConfig.RPN_ANCHOR_STRIDE);
+  anchors = normBoxes(anchors, [imageShape[0], imageShape[1]]);
+  await File(filename).writeAsString(jsonEncode(anchors));
+  return anchors;
+}
+
+computeBackboneShapes(List imageShape, List<int> backboneStrides) {
   List output = [];
-  for (var value in backboneStrides) {
+  for (int value in backboneStrides)
     output
         .add([(imageShape[0] / value).ceil(), (imageShape[1] / value).ceil()]);
-  }
+
   return output;
+}
+
+generatePyramidAnchors(List scales, List ratios, List featureShapes,
+    featureStrides, int anchorStride) {
+  var anchors = [];
+  for (var i = 0; i < scales.length; i++) {
+    anchors.add(generateAnchors(
+        scales[i], ratios, featureShapes[i], featureStrides[i], anchorStride));
+  }
+  var pyramidAnchors = [];
+  for (var anchor in anchors) {
+    pyramidAnchors.addAll(anchor);
+  }
+  return pyramidAnchors;
 }
 
 generateAnchors(scales, ratios, shape, featureStride, int anchorStride) {
   scales = List.generate(ratios.length, (index) => scales);
 
   var heights = List.generate(
-      ratios.length, (index) => scales[index] / sqrt(ratios[index]));
+      ratios.length, (i) => scales[i] / sqrt(ratios[i]));
   var widths = List.generate(
-      ratios.length, (index) => scales[index] * sqrt(ratios[index]));
+      ratios.length, (i) => scales[i] * sqrt(ratios[i]));
   var shiftsY = [];
   for (var i = 0; i < shape[0]; i += anchorStride) {
     shiftsY.add(i * featureStride);
@@ -284,6 +438,34 @@ generateAnchors(scales, ratios, shape, featureStride, int anchorStride) {
   return boxes;
 }
 
+meshGrid(List x, List y) {
+  var outputX = [];
+  var outputY = [];
+
+  var flattenX = x.flatten();
+  var flattenY = y.flatten();
+
+  for (var i = 0; i < flattenY.length; i++) {
+    var tempX = [];
+    var tempY = [];
+    for (var j = 0; j < flattenX.length; j++) {
+      tempX.add(flattenX[j]);
+      tempY.add(flattenY[i]);
+    }
+    outputX.add(tempX);
+    outputY.add(tempY);
+  }
+  return [outputX, outputY];
+}
+
+stackAxis2(List x, List y) {
+  List output = [];
+  for (var i = 0; i < x.length; i++) {
+    for (var j = 0; j < x[i].length; j++) output.add([x[i][j], y[i][j]]);
+  }
+  return output;
+}
+
 concatenateAxis1(List x, List y) {
   var output = [];
   for (var i = 0; i < x.length; i++) {
@@ -299,82 +481,11 @@ concatenateAxis1(List x, List y) {
   return output;
 }
 
-stackAxis2(List x, List y) {
-  List output = [];
-  for (var i = 0; i < x.length; i++) {
-    for (var j = 0; j < x[i].length; j++) output.add([x[i][j], y[i][j]]);
-  }
-  return output;
-}
-
-meshGrid(List x, List y) {
-  var outputX = [];
-  var outputY = [];
-
-  var flattenX = [];
-  if (x[0] is List)
-    x.forEach((e) {
-      flattenX.addAll(e);
-    });
-  else
-    flattenX = x;
-
-  var flattenY = [];
-  if (y[0] is List)
-    y.forEach((e) {
-      flattenY.addAll(e);
-    });
-  else
-    flattenY = y;
-
-  for (var i = 0; i < flattenY.length; i++) {
-    var tempX = [];
-    var tempY = [];
-    for (var j = 0; j < flattenX.length; j++) {
-      tempX.add(flattenX[j]);
-      tempY.add(flattenY[i]);
-    }
-    outputX.add(tempX);
-    outputY.add(tempY);
-  }
-  return [outputX, outputY];
-}
-
-generatePyramidAnchors(
-    List scales, ratios, featureShapes, featureStrides, int anchorStride) {
-  var anchors = [];
-  for (var i = 0; i < scales.length; i++) {
-    anchors.add(generateAnchors(
-        scales[i], ratios, featureShapes[i], featureStrides[i], anchorStride));
-  }
-  var pyramidAnchors = [];
-  for (var i in anchors) {
-    pyramidAnchors.addAll(i);
-  }
-  return pyramidAnchors;
-}
-
-getAnchors(List imageShape) {
-  var RPN_ANCHOR_SCALES = [32, 64, 128, 256, 512];
-  var RPN_ANCHOR_RATIOS = [0.5, 1, 2];
-  var BACKBONE_STRIDES = [4, 8, 16, 32, 64];
-  var RPN_ANCHOR_STRIDE = 1;
-
-  var backboneShapes = computeBackboneShapes(imageShape, BACKBONE_STRIDES);
-  var anchorCache = {};
-  var anchors = generatePyramidAnchors(RPN_ANCHOR_SCALES, RPN_ANCHOR_RATIOS,
-      backboneShapes, BACKBONE_STRIDES, RPN_ANCHOR_STRIDE);
-  // TODO: make as global var
-  anchorCache[imageShape] = normBoxes(anchors, [imageShape[0], imageShape[1]]);
-  return anchorCache[imageShape];
-}
-
 normBoxes(boxes, shape) {
   var h = shape[0];
   var w = shape[1];
   var scale = [h - 1, w - 1, h - 1, w - 1];
   var shift = [0, 0, 1, 1];
-
   var output = [];
   for (var box in boxes) {
     var temp = [];
@@ -386,126 +497,236 @@ normBoxes(boxes, shape) {
   return output;
 }
 
-predict(Img image) async //Predicts the image using the pretrained model
-{
-  final interpreter = await tfl.Interpreter.fromAsset('model.tflite');
-  var byteList = bytesToArray(image.image!);
+unmoldDetections(
+    detections, List mrcnnMask, originalImageShape, imageShape, window) {
+  var N = detections.length;
+  for (var i = 0; i < detections.length; i++) {
+    if (detections[i][4] == 0) {
+      N = i;
+      break;
+    }
+  }
 
-  var moldOutput = moldInputs(byteList);
+  var boxes = [];
+  var classIds = [];
+  var scores = [];
+  List masks = [];
+  for (var i = 0; i < N; i++) {
+    boxes.add(List.generate(4, (index) => detections[i][index]));
+    classIds.add(detections[i][4].toInt());
+    scores.add(detections[i][5]);
+    var tempList = [];
+    for (var j = 0; j < mrcnnMask[i].length; j++) {
+      var tempList2  = [];
+      for (var k = 0; k < mrcnnMask[i][j].length; k++) {
+        tempList2.add(mrcnnMask[i][j][k][classIds[i]]);
+      }
+      tempList.add(tempList2);
+    }
+    masks.add(tempList);
+  }
+  window = normBoxes([window], imageShape)[0];
+  var wy1 = window[0];
+  var wx1 = window[1];
+  var wy2 = window[2];
+  var wx2 = window[3];
+  var shift = [wy1, wx1, wy1, wx1];
+  var wh = wy2 - wy1;
+  var ww = wx2 - wx1;
+  var scale = [wh, ww, wh, ww];
+  for (var i = 0; i < boxes.length; i++) {
+    for (var j = 0; j < boxes[i].length; j++) {
+      boxes[i][j] = (boxes[i][j] - shift[j]) / scale[j];
+    }
+  }
+  boxes = denormBoxes(boxes, originalImageShape);
+  List fullMasks = [];
+  for (var i = 0; i < N; i++) {
+    var fullMask = unmoldMask(masks[i], boxes[i], originalImageShape);
+    fullMasks.add(fullMask);
+  }
+  var fullMasksStack = [];
+  if (fullMasks.isNotEmpty) {
+    print('fullMasks not empty');
+    for (var i = 0; i < fullMasks[0].length; i++) {
+      var tempList2 = [];
+      for (var j = 0; j < fullMasks[0][0].length; j++) {
+        var tempList = [];
+        for (var k = 0; k < fullMasks.length; k++) {
+          tempList.add(fullMasks[k][i][j]);
+        }
+        tempList2.add(tempList);
+      }
+      fullMasksStack.add(tempList2);
+    }
+  } else {
+    print('fullMasks empty :(');
+  }
+  return [boxes, classIds, scores, fullMasksStack];
+}
+
+denormBoxes(List boxes, shape) {
+  var h = shape[0];
+  var w = shape[1];
+  var scale = [h - 1, w - 1, h - 1, w - 1];
+  var shift = [0, 0, 1, 1];
+  for (var i = 0; i < boxes.length; i++) {
+    for (var j = 0; j < boxes[i].length; j++) {
+      boxes[i][j] = (boxes[i][j] * scale[j] + shift[j]).round();
+    }
+  }
+  return boxes;
+}
+
+unmoldMask(mask, bbox, imageShape) {
+  // var threshold = 0.5;
+  // var y1 = bbox[0];
+  // var x1 = bbox[1];
+  // var y2 = bbox[2];
+  // var x2 = bbox[3];
+  // TODO: resize mask
+  var fullMask = List.generate(imageShape[0],
+      (index) => List<bool>.generate(imageShape[1], (index) => false));
+/*  for (var i = y1; i < y2; i++) {
+    for (var j = x1; j < x2; j++) {
+      fullMask[i][j] = mask[i - y1][j - x1];
+    }
+  }*/
+  return fullMask;
+}
+
+displayInstances(List image, List boxes, List masks, List classIds, classNames,
+    {scores, title, showMask = true, showBbox = true, colors, captions}) async {
+  print(image);
+  var N = boxes.shape[0];
+/*  if (N == 0) {
+    print("No instances to display");
+  } else {
+    assert((boxes.shape[0] == masks.shape[3]) == classIds.shape[0]);
+  }*/
+  if (colors == null) {
+    colors = randomColors(N);
+  }
+
+  var height = image.shape[0];
+  var width = image.shape[1];
+
+  print(image);
+  ImagePackage.Image maskedImage = ImagePackage.Image.fromBytes(
+      width, height, image.flatten(),
+      format: ImagePackage.Format.rgb);
+  print(maskedImage.getBytes(format: ImagePackage.Format.rgb));
+  for (var i = 0; i < N; i++) {
+    var color = colors[i];
+    //     if not np.any(boxes[i]):
+    // # Skip this instance. Has no bbox. Likely lost in image cropping.
+    // continue
+    var y1 = boxes[i][0];
+    var x1 = boxes[i][1];
+    var y2 = boxes[i][2];
+    var x2 = boxes[i][3];
+
+    maskedImage = ImagePackage.drawRect(maskedImage, x1, y1, x2, y2, color);
+    if (captions == null) {
+      var classId = classIds[i];
+      var score = scores != null ? scores[i] : null;
+      var label = CocoConfig.classNames[classId];
+      var caption = score != null ? '$label $score' : '$label';
+      maskedImage = ImagePackage.drawString(
+          maskedImage, ImagePackage.arial_14, x1, y1 + 8, caption,
+          color: color);
+    }
+    // TODO: Mask
+  }
+  Directory appDocumentsDirectory = await getApplicationDocumentsDirectory();
+  String appDocumentsPath = appDocumentsDirectory.path;
+  var now = DateTime.now();
+  var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
+  String currentTimeStamp = formatter.format(now);
+  var filename = '$appDocumentsPath/$currentTimeStamp.png';
+  filename = '/storage/emulated/0/Download/$currentTimeStamp.png';
+  await File(filename).writeAsBytes(ImagePackage.encodePng(maskedImage));
+  return filename;
+}
+
+randomColors(N, [bright = true]) {
+  var brightness = bright ? 1.0 : 0.7;
+  var hsv = List.generate(
+      N, (i) => HSVColor.fromAHSV(1.0, i / N * 360.0, 1.0, brightness));
+  var rgb = List.generate(N, (i) => hsv[i].toColor().value);
+  // var rgb = List.generate(N, (i) =>[hsv[i].toColor().red, hsv[i].toColor().green, hsv[i].toColor().blue]);
+  rgb.shuffle();
+  return rgb;
+}
+
+predict(ImagePackage.Image image) async //Predicts the image using the pretrained model
+{
+  print('predict');
+  final interpreter = await tfl.Interpreter.fromAsset('model.tflite');
+  List imageList = bytesToArray(image);
+  print(imageList);
+  var moldOutput = moldInputs(imageList);
+  print(imageList);
   List<List> moldedImages = moldOutput[0];
   List imageMetas = moldOutput[1];
   List windows = moldOutput[2];
-
-  var anchors = [getAnchors(moldedImages[0].shape)];
-  print('${moldedImages.shape} ${imageMetas.shape}, ${anchors.shape}');
-  print(moldedImages);
-  print(imageMetas);
-  print(anchors);
+  var anchors = [await getAnchors(moldedImages[0].shape)];
   var inputs = [moldedImages, imageMetas, anchors];
+  var outputTensors = interpreter.getOutputTensors();
+  var outputShapes = [];
+  outputTensors.forEach((tensor) {
+    outputShapes.add(tensor.shape);
+  });
 
-  var outputs = {
-    0: [
-      List.filled(1000, [0.0, 0.0, 0.0, 0.0])
-    ],
-    1: [
-      List.filled(1000, List.filled(81, [0.0, 0.0, 0.0, 0.0]))
-    ],
-    2: [List.filled(1000, List.filled(81, 0.0))],
-    3: [List.filled(100, List.filled(6, 0.0))],
-    4: [
-      List.filled(100, List.filled(28, List.filled(28, List.filled(81, 0.0))))
-    ],
-    5: [List.filled(261888, List.filled(4, 0.0))],
-    6: [List.filled(261888, List.filled(2, 0.0))]
-  };
+  var detections = TensorBufferFloat(outputShapes[3]);
+  var mrcnnMask = TensorBufferFloat(outputShapes[4]);
+  var outputs = <int, Object>{};
+  for (var i = 0; i < outputTensors.length; i++) {
+    if (i == 3)
+      outputs[i] = detections.buffer;
+    else if (i == 4)
+      outputs[i] = mrcnnMask.buffer;
+    else
+      outputs[i] = TensorBufferFloat(outputShapes[i]).buffer;
+  }
   print('start inference');
   interpreter.runForMultipleInputs(inputs, outputs);
+  interpreter.close();
   print('end inference');
-  for(var i = 0; i < 7; i++)
-    {
-      print(outputs[i]);
-    }
-  // print(outputs[0]);
-/*  for(var out in outputs[3]![0])
-    {
-      for(var num in out)
-        {
-          if(num != 0.0)
-            {
-              print(out);
-            }
-        }
-    }
-  print(outputs[3]);
-  print(outputs[4]);*/
-  // var input0 = [];
-  // input0.add([]);
-  // for (var i = 0; i < 1024; i++) {
-  //   print('in for loop');
-  //   var tempX = [];
-  //   for (var j = 0; j < 1024; j++) {
-  //     tempX.add([0.0, 0.0, 0.0]);
-  //   }
-  //   input0[0].add(tempX);
-  // }
-  // print('input shape:');
-  // print(input0.shape);
-  //
-  // var input1 = [];
-  // input1.add([]);
-  // for (var i = 0; i < 93; i++) {
-  //   input1[0].add(0.0);
-  // }
-  // print(input1.shape);
-  //
-  // var input2 = [];
-  // input2.add([]);
-  // for (var i = 0; i < 261888; i++) {
-  //   input2[0].add([0.0, 0.0, 0.0, 0.0]);
-  // }
-  // print(input2.shape);
-  // // input: List<Object>
-  // var inputs = [input0, input1, input2];
-  //
-  // var output0 = [
-  //   List.filled(1000, [0.0, 0.0, 0.0, 0.0])
-  // ];
-  // var output1 = [
-  //   List.filled(1000, List.filled(81, [0.0, 0.0, 0.0, 0.0]))
-  // ];
-  // var output2 = [List.filled(1000, List.filled(81, 0.0))];
-  // var output3 = [List.filled(100, List.filled(6, 0.0))];
-  // var output4 = [
-  //   List.filled(100, List.filled(28, List.filled(28, List.filled(81, 0.0))))
-  // ];
-  // var output5 = [List.filled(261888, List.filled(4, 0.0))];
-  // var output6 = [List.filled(261888, List.filled(2, 0.0))];
-  //
-  // print(output0.shape);
-  // print(output1.shape);
-  // print(output2.shape);
-  // print(output3.shape);
-  // print(output4.shape);
-  // print(output5.shape);
-  // print(output6.shape);
-  //
-  // // output: Map<int, Object>
-  // var outputs = {
-  //   0: output0,
-  //   1: output1,
-  //   2: output2,
-  //   3: output3,
-  //   4: output4,
-  //   5: output5,
-  //   6: output6
-  // };
-  //
-  // // inference
-  // print('start inference');
-  // interpreter.runForMultipleInputs(inputs, outputs);
-  // print('end inference');
-  // // print outputs
-  // print(outputs);
+  List detectionsList = detections.getDoubleList().reshape(outputShapes[3]);
+  List mrcnnMaskList = mrcnnMask.getDoubleList().reshape(outputShapes[4]);
+/*  var json_detections =
+      jsonDecode(await rootBundle.loadString('assets/detections.json'));
+  List detections = json_detections['detections'];
+  List mrcnnMask = json_detections['mrcnn_mask'];
+  List imageList = json_detections['image'];
+  List moldedImages = json_detections['molded_image'];
+  List windows = json_detections['windows'];
+  detections[2][4] = 0;*/
+  var unmoldOutput = await unmoldDetections(detectionsList[0], mrcnnMaskList[0],
+      imageList.shape, moldedImages[0].shape, windows[0]);
+  var finalRois = unmoldOutput[0];
+  var finalClassIds = unmoldOutput[1];
+  var finalScores = unmoldOutput[2];
+  var finalMasks = unmoldOutput[3];
+  var filename = await displayInstances(
+      imageList, finalRois, finalMasks, finalClassIds, CocoConfig.classNames,
+      scores: finalScores);
+  print(filename);
+  return filename;
+/*  Interpreter _interpreter;
+  List<int> _inputShape;
+  Map<int, ByteBuffer> _outputBuffers = new Map<int, ByteBuffer>();
+  Map<int, TensorBuffer> _outputTensorBuffers = new Map<int, TensorBuffer>();
+  Map<int, String> _outputTensorNames = new Map<int, String>();
+
+  outputTensors.asMap().forEach((i, tensor) {
+    TensorBuffer output =
+    TensorBuffer.createFixedSize(tensor.shape, tensor.type);
+    _outputTensorBuffers[i] = output;
+    _outputBuffers[i] = output.buffer;
+    _outputTensorNames[i] = tensor.name;
+  });*/
 }
 
 Future<bool> internetAvailable() async {

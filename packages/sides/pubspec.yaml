@@ -9,7 +9,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-#  tflite: ^1.1.0
   tflite_flutter: ^0.9.0
   intl: ^0.17.0
   path_provider: ^2.0.2
@@ -22,6 +21,8 @@ dependencies:
       url: git://github.com/draganjovanovic1/Flogs
   image: ^3.0.2
   matrix2d: ^1.0.0
+  tflite_flutter_helper: ^0.3.0
+  color_convert: ^1.0.2
 
 
 
