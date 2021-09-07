@@ -126,26 +126,31 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
 //Take a picture
-  Future getImage() async {
+  Future getImage({camera = true, imagePath}) async {
     print('getImage');
     if (!_pictureScreen.cameraInterface.controller.value.isInitialized!) {
       return;
     }
-
-    var cacheDir = await getTemporaryDirectory();
-    var now = DateTime.now();
-    var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
-    String currentTimeStamp = formatter.format(now);
-    var path = cacheDir.path + "/" + currentTimeStamp;
-    await _pictureScreen.cameraInterface.controller.takePicture(path);
-
-    // ByteData imageData = await rootBundle.load('assets/$imageName');
-    // List<int> bytes = Uint8List.view(imageData.buffer);
-    // ImagePackage.Image image = ImagePackage.decodeImage(bytes)!;
-    ImagePackage.Image image =
-        ImagePackage.decodeImage(File(path).readAsBytesSync())!;
-    image = ImagePackage.copyResize(image, width: 512, height: 512);
-    // var image = ImagePackage.decodeJpg((await getImageFileFromAssets(imageName)).readAsBytesSync());
+    late ImagePackage.Image image;
+    if (camera) {
+      print('camera');
+      var cacheDir = await getApplicationDocumentsDirectory();
+      var now = DateTime.now();
+      var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
+      String currentTimeStamp = formatter.format(now);
+      var path = '/storage/emulated/0/Download/$currentTimeStamp.jpg';
+      await _pictureScreen.cameraInterface.controller.takePicture(path);
+      image = ImagePackage.decodeImage(File(path).readAsBytesSync())!;
+      print('image res: ${image.width}x${image.height}');
+    } else {
+      print('else');
+      ByteData imageData = await rootBundle.load(imagePath);
+      List<int> bytes = Uint8List.view(imageData.buffer);
+      image = ImagePackage.decodeImage(bytes)!;
+      // var image = ImagePackage.decodeJpg((await getImageFileFromAssets(imageName)).readAsBytesSync());
+    }
+    image = ImagePackage.copyResizeCropSquare(image, 512);
+    image = ImagePackage.copyRotate(image, 90);
     filename = await predict(image);
     if (filename != null)
       setState(() {
@@ -188,7 +193,38 @@ class _MyHomePageState extends State<MyHomePage> {
       controller: pageController,
       physics: NeverScrollableScrollPhysics(),
       onPageChanged: _pageChanged,
-      children: <Widget>[_pictureScreen, MrcnnPage(filename), LogPage()],
+      children: <Widget>[_pictureScreen, mrcnnPage(), LogPage()],
+    );
+  }
+
+  Widget mrcnnPage() {
+    var imagesList = ['assets/car_512_512.jpg', 'assets/car_800_552.jpg'];
+    return Container(
+      child: Stack(
+        alignment: Alignment.bottomLeft,
+        children: [
+          Center(
+            child: filename == null
+                ? Icon(
+                    Icons.image_not_supported,
+                    // color: Colors.white,
+                    size: 100,
+                  )
+                : Image.file(File(filename!)),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(
+                imagesList.length,
+                (i) => IconButton(
+                    iconSize: 100,
+                    icon: Image.asset(imagesList[i]),
+                    onPressed: () async {
+                      getImage(camera: false, imagePath: imagesList[i]);
+                    })),
+          ),
+        ],
+      ),
     );
   }
 
@@ -257,19 +293,6 @@ class SingleNotifier extends ChangeNotifier {
 
 //Dialogue to ask for the real side
 
-class MrcnnPage extends StatelessWidget {
-  final String? filename;
-
-  const MrcnnPage(this.filename, {Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      child: filename == null ? null : Image.file(File(filename!)),
-    );
-  }
-}
-
 class ImagePreviewPage extends StatefulWidget {
   final CameraDescription? camera;
   final CameraInterface cameraInterface = new CameraInterface();
@@ -316,25 +339,6 @@ class ImagePreviewPageState extends State<ImagePreviewPage>
       widget.cameraInterface.initializeControllerFuture
           .then((value) => setState(() {}));
     }
-
-    // if (!widget.cameraInterface.cameraStarted &&
-    //     state == AppLifecycleState.resumed) {
-    //   widget.controllerInitialize(resolution);
-    //   FLog.info(
-    //       className: "TakePictureScreenState",
-    //       methodName: "AppState",
-    //       text: "Initialize camera");
-    //   widget.cameraInterface.cameraStarted = true;
-    //   widget.cameraInterface.initializeControllerFuture
-    //       .then((value) => setState(() {}));
-    // } else if (widget.cameraInterface.cameraStarted) {
-    //   FLog.info(
-    //       className: "TakePictureScreenState",
-    //       methodName: "AppState",
-    //       text: "Dispose camera");
-    //   widget.cameraInterface.controller.dispose();
-    //   widget.cameraInterface.cameraStarted = false;
-    // }
   }
 
   @override

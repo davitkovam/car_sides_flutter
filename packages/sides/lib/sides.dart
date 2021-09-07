@@ -528,11 +528,10 @@ unmoldMask(mask, bbox, imageShape) {
 
 displayInstances(List image, List boxes, List masks, List classIds, classNames,
     {scores, title, showMask = true, showBbox = true, colors, captions}) async {
+  print(boxes);
   if (boxes.isEmpty) {
     print("No instances to display");
     return;
-  } else {
-    assert((boxes.shape[0] == masks.shape[3]) == classIds.shape[0]);
   }
   var N = boxes.shape[0];
   if (colors == null) {
