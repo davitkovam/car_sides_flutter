@@ -89,7 +89,8 @@ class CarSides {
   String confidenceToPercent() => "${(confidence * 100).round()}%";
 }
 
-class CocoConfig {
+
+class CarPartsConfig {
   static const String BACKBONE = 'resnet101';
   static const List<int> BACKBONE_STRIDES = [4, 8, 16, 32, 64];
   static const int BATCH_SIZE = 1;
@@ -104,12 +105,12 @@ class CocoConfig {
   static const double GRADIENT_CLIP_NORM = 5.0;
   static const int IMAGES_PER_GPU = 1;
   static const int IMAGE_CHANNEL_COUNT = 3;
-  static const int IMAGE_MAX_DIM = 1024;
-  static const int IMAGE_META_SIZE = 93;
-  static const int IMAGE_MIN_DIM = 800;
+  static const int IMAGE_MAX_DIM = 512;
+  static const int IMAGE_META_SIZE = 31;
+  static const int IMAGE_MIN_DIM = 512;
   static const int IMAGE_MIN_SCALE = 0;
   static const String IMAGE_RESIZE_MODE = 'square';
-  static const List<int> IMAGE_SHAPE = [1024, 1024, 3];
+  static const List<int> IMAGE_SHAPE = [512, 512, 3];
   static const double LEARNING_MOMENTUM = 0.9;
   static const double LEARNING_RATE = 0.001;
   static const Map<String, double> LOSS_WEIGHTS = {
@@ -124,15 +125,15 @@ class CocoConfig {
   static const int MAX_GT_INSTANCES = 100;
   static const List<double> MEAN_PIXEL = [123.7, 116.8, 103.9];
   static const List<int> MINI_MASK_SHAPE = [56, 56];
-  static const String NAME = 'coco';
-  static const int NUM_CLASSES = 81;
+  static const String NAME = 'car_part';
+  static const int NUM_CLASSES = 19;
   static const int POOL_SIZE = 7;
   static const int POST_NMS_ROIS_INFERENCE = 1000;
   static const int POST_NMS_ROIS_TRAINING = 2000;
   static const int PRE_NMS_LIMIT = 6000;
   static const double ROI_POSITIVE_RATIO = 0.33;
   static const List<double> RPN_ANCHOR_RATIOS = [0.5, 1, 2];
-  static const List<double> RPN_ANCHOR_SCALES = [32, 64, 128, 256, 512];
+  static const List<double> RPN_ANCHOR_SCALES = [8, 16, 32, 64, 128];
   static const int RPN_ANCHOR_STRIDE = 1;
   static const List<double> RPN_BBOX_STD_DEV = [0.1, 0.1, 0.2, 0.2];
   static const double RPN_NMS_THRESHOLD = 0.7;
@@ -147,86 +148,24 @@ class CocoConfig {
   static const double WEIGHT_DECAY = 0.0001;
   static const List classNames = [
     'BG',
-    'person',
-    'bicycle',
-    'car',
-    'motorcycle',
-    'airplane',
-    'bus',
-    'train',
-    'truck',
-    'boat',
-    'traffic light',
-    'fire hydrant',
-    'stop sign',
-    'parking meter',
-    'bench',
-    'bird',
-    'cat',
-    'dog',
-    'horse',
-    'sheep',
-    'cow',
-    'elephant',
-    'bear',
-    'zebra',
-    'giraffe',
-    'backpack',
-    'umbrella',
-    'handbag',
-    'tie',
-    'suitcase',
-    'frisbee',
-    'skis',
-    'snowboard',
-    'sports ball',
-    'kite',
-    'baseball bat',
-    'baseball glove',
-    'skateboard',
-    'surfboard',
-    'tennis racket',
-    'bottle',
-    'wine glass',
-    'cup',
-    'fork',
-    'knife',
-    'spoon',
-    'bowl',
-    'banana',
-    'apple',
-    'sandwich',
-    'orange',
-    'broccoli',
-    'carrot',
-    'hot dog',
-    'pizza',
-    'donut',
-    'cake',
-    'chair',
-    'couch',
-    'potted plant',
-    'bed',
-    'dining table',
-    'toilet',
-    'tv',
-    'laptop',
-    'mouse',
-    'remote',
-    'keyboard',
-    'cell phone',
-    'microwave',
-    'oven',
-    'toaster',
-    'sink',
-    'refrigerator',
-    'book',
-    'clock',
-    'vase',
-    'scissors',
-    'teddy bear',
-    'hair drier',
-    'toothbrush'
+    'back_bumper',
+    'back_glass',
+    'back_left_door',
+    'back_left_light',
+    'back_right_door',
+    'back_right_light',
+    'front_bumper',
+    'front_glass',
+    'front_left_door',
+    'front_left_light',
+    'front_right_door',
+    'front_right_light',
+    'hood',
+    'left_mirror',
+    'right_mirror',
+    'tailgate',
+    'trunk',
+    'wheel'
   ];
 }
 
@@ -272,17 +211,17 @@ bytesToArray(ImagePackage.Image image) {
 
 moldInputs(List image) {
   var resizeOutput = resizeImage(image,
-      minDim: CocoConfig.IMAGE_MIN_DIM,
-      maxDim: CocoConfig.IMAGE_MAX_DIM,
-      minScale: CocoConfig.IMAGE_MIN_SCALE,
-      mode: CocoConfig.IMAGE_RESIZE_MODE);
+      minDim: CarPartsConfig.IMAGE_MIN_DIM,
+      maxDim: CarPartsConfig.IMAGE_MAX_DIM,
+      minScale: CarPartsConfig.IMAGE_MIN_SCALE,
+      mode: CarPartsConfig.IMAGE_RESIZE_MODE);
   List moldedImage = resizeOutput[0];
   var window = resizeOutput[1];
   var scale = resizeOutput[2];
   // var padding = resizeOutput[3];
   // var crop = resizeOutput[4];
   moldedImage = moldImage(moldedImage);
-  var zerosList = List.filled(CocoConfig.NUM_CLASSES, 0);
+  var zerosList = List.filled(CarPartsConfig.NUM_CLASSES, 0);
   List imageMeta = composeImageMeta(
       0, image.shape, moldedImage.shape, window, scale, zerosList);
   return [
@@ -334,7 +273,7 @@ resizeImage(List image, {minDim, maxDim, minScale, mode = "square"}) {
 moldImage(image) {
   for (int i = 0; i < image.length; i++)
     for (int j = 0; j < image[i].length; j++)
-      for (int k = 0; k < 3; k++) image[i][j][k] -= CocoConfig.MEAN_PIXEL[k];
+      for (int k = 0; k < 3; k++) image[i][j][k] -= CarPartsConfig.MEAN_PIXEL[k];
 
   return image;
 }
@@ -362,15 +301,15 @@ getAnchors(List imageShape) async {
     print('Anchors exist');
     return jsonDecode(await File(filename).readAsString());
   }
-
+  print('Anchors don\'t exist');
   var backboneShapes =
-      computeBackboneShapes(imageShape, CocoConfig.BACKBONE_STRIDES);
+      computeBackboneShapes(imageShape, CarPartsConfig.BACKBONE_STRIDES);
   var anchors = generatePyramidAnchors(
-      CocoConfig.RPN_ANCHOR_SCALES,
-      CocoConfig.RPN_ANCHOR_RATIOS,
+      CarPartsConfig.RPN_ANCHOR_SCALES,
+      CarPartsConfig.RPN_ANCHOR_RATIOS,
       backboneShapes,
-      CocoConfig.BACKBONE_STRIDES,
-      CocoConfig.RPN_ANCHOR_STRIDE);
+      CarPartsConfig.BACKBONE_STRIDES,
+      CarPartsConfig.RPN_ANCHOR_STRIDE);
   anchors = normBoxes(anchors, [imageShape[0], imageShape[1]]);
   await File(filename).writeAsString(jsonEncode(anchors));
   return anchors;
@@ -402,10 +341,9 @@ generatePyramidAnchors(List scales, List ratios, List featureShapes,
 generateAnchors(scales, ratios, shape, featureStride, int anchorStride) {
   scales = List.generate(ratios.length, (index) => scales);
 
-  var heights = List.generate(
-      ratios.length, (i) => scales[i] / sqrt(ratios[i]));
-  var widths = List.generate(
-      ratios.length, (i) => scales[i] * sqrt(ratios[i]));
+  var heights =
+      List.generate(ratios.length, (i) => scales[i] / sqrt(ratios[i]));
+  var widths = List.generate(ratios.length, (i) => scales[i] * sqrt(ratios[i]));
   var shiftsY = [];
   for (var i = 0; i < shape[0]; i += anchorStride) {
     shiftsY.add(i * featureStride);
@@ -510,7 +448,7 @@ unmoldDetections(
     scores.add(detections[i][5]);
     var tempList = [];
     for (var j = 0; j < mrcnnMask[i].length; j++) {
-      var tempList2  = [];
+      var tempList2 = [];
       for (var k = 0; k < mrcnnMask[i][j].length; k++) {
         tempList2.add(mrcnnMask[i][j][k][classIds[i]]);
       }
@@ -607,7 +545,6 @@ displayInstances(List image, List boxes, List masks, List classIds, classNames,
   ImagePackage.Image maskedImage = ImagePackage.Image.fromBytes(
       width, height, image.flatten(),
       format: ImagePackage.Format.rgb);
-  print(maskedImage.getBytes(format: ImagePackage.Format.rgb));
   for (var i = 0; i < N; i++) {
     var color = colors[i];
     //     if not np.any(boxes[i]):
@@ -622,7 +559,7 @@ displayInstances(List image, List boxes, List masks, List classIds, classNames,
     if (captions == null) {
       var classId = classIds[i];
       var score = scores != null ? scores[i] : null;
-      var label = CocoConfig.classNames[classId];
+      var label = CarPartsConfig.classNames[classId];
       var caption = score != null ? '$label $score' : '$label';
       maskedImage = ImagePackage.drawString(
           maskedImage, ImagePackage.arial_14, x1, y1 + 8, caption,
@@ -651,11 +588,14 @@ randomColors(N, [bright = true]) {
   return rgb;
 }
 
-predict(ImagePackage.Image image) async //Predicts the image using the pretrained model
+predict(
+    ImagePackage.Image
+        image) async //Predicts the image using the pretrained model
 {
   print('predict');
-  final interpreter = await tfl.Interpreter.fromAsset('model.tflite');
+  final interpreter = await tfl.Interpreter.fromAsset('car_parts.tflite');
   List imageList = bytesToArray(image);
+  print(imageList.shape);
   var moldOutput = moldInputs(imageList);
   List<List> moldedImages = moldOutput[0];
   List imageMetas = moldOutput[1];
@@ -665,6 +605,7 @@ predict(ImagePackage.Image image) async //Predicts the image using the pretraine
   var outputTensors = interpreter.getOutputTensors();
   var outputShapes = [];
   outputTensors.forEach((tensor) {
+    print(tensor.shape);
     outputShapes.add(tensor.shape);
   });
 
@@ -685,6 +626,8 @@ predict(ImagePackage.Image image) async //Predicts the image using the pretraine
   print('end inference');
   List detectionsList = detections.getDoubleList().reshape(outputShapes[3]);
   List mrcnnMaskList = mrcnnMask.getDoubleList().reshape(outputShapes[4]);
+  print(detectionsList);
+  print(mrcnnMaskList);
 /*  var json_detections =
       jsonDecode(await rootBundle.loadString('assets/detections.json'));
   List detections = json_detections['detections'];
@@ -699,8 +642,8 @@ predict(ImagePackage.Image image) async //Predicts the image using the pretraine
   var finalClassIds = unmoldOutput[1];
   var finalScores = unmoldOutput[2];
   var finalMasks = unmoldOutput[3];
-  var filename = await displayInstances(
-      bytesToArray(image), finalRois, finalMasks, finalClassIds, CocoConfig.classNames,
+  var filename = await displayInstances(bytesToArray(image), finalRois,
+      finalMasks, finalClassIds, CarPartsConfig.classNames,
       scores: finalScores);
   print(filename);
   return filename;

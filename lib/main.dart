@@ -99,9 +99,10 @@ class _MyHomePageState extends State<MyHomePage> {
 //Take a picture
   Future getImage() async {
     print('getImage');
-    ByteData imageData = await rootBundle.load('assets/car_1024_1024.jpg');
+    ByteData imageData = await rootBundle.load('assets/$imageName');
     List<int> bytes = Uint8List.view(imageData.buffer);
     ImagePackage.Image image = ImagePackage.decodeImage(bytes)!;
+    image = ImagePackage.copyResize(image, width: 512, height: 512);
     // var image = ImagePackage.decodeJpg((await getImageFileFromAssets(imageName)).readAsBytesSync());
     filename = await predict(image);
     setState(() {
