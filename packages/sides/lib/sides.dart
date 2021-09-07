@@ -281,17 +281,10 @@ moldInputs(List image) {
   var scale = resizeOutput[2];
   // var padding = resizeOutput[3];
   // var crop = resizeOutput[4];
-  print('originalImage before');
-  print(image);
   moldedImage = moldImage(moldedImage);
-  print('originalImage after');
-  print(image);
-  print('moldedImage');
-  print(moldedImage);
   var zerosList = List.filled(CocoConfig.NUM_CLASSES, 0);
   List imageMeta = composeImageMeta(
       0, image.shape, moldedImage.shape, window, scale, zerosList);
-  print(image);
   return [
     [moldedImage],
     [imageMeta],
@@ -611,7 +604,6 @@ displayInstances(List image, List boxes, List masks, List classIds, classNames,
   var height = image.shape[0];
   var width = image.shape[1];
 
-  print(image);
   ImagePackage.Image maskedImage = ImagePackage.Image.fromBytes(
       width, height, image.flatten(),
       format: ImagePackage.Format.rgb);
@@ -664,9 +656,7 @@ predict(ImagePackage.Image image) async //Predicts the image using the pretraine
   print('predict');
   final interpreter = await tfl.Interpreter.fromAsset('model.tflite');
   List imageList = bytesToArray(image);
-  print(imageList);
   var moldOutput = moldInputs(imageList);
-  print(imageList);
   List<List> moldedImages = moldOutput[0];
   List imageMetas = moldOutput[1];
   List windows = moldOutput[2];
@@ -710,23 +700,10 @@ predict(ImagePackage.Image image) async //Predicts the image using the pretraine
   var finalScores = unmoldOutput[2];
   var finalMasks = unmoldOutput[3];
   var filename = await displayInstances(
-      imageList, finalRois, finalMasks, finalClassIds, CocoConfig.classNames,
+      bytesToArray(image), finalRois, finalMasks, finalClassIds, CocoConfig.classNames,
       scores: finalScores);
   print(filename);
   return filename;
-/*  Interpreter _interpreter;
-  List<int> _inputShape;
-  Map<int, ByteBuffer> _outputBuffers = new Map<int, ByteBuffer>();
-  Map<int, TensorBuffer> _outputTensorBuffers = new Map<int, TensorBuffer>();
-  Map<int, String> _outputTensorNames = new Map<int, String>();
-
-  outputTensors.asMap().forEach((i, tensor) {
-    TensorBuffer output =
-    TensorBuffer.createFixedSize(tensor.shape, tensor.type);
-    _outputTensorBuffers[i] = output;
-    _outputBuffers[i] = output.buffer;
-    _outputTensorNames[i] = tensor.name;
-  });*/
 }
 
 Future<bool> internetAvailable() async {
