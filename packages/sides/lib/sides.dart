@@ -89,7 +89,6 @@ class CarSides {
   String confidenceToPercent() => "${(confidence * 100).round()}%";
 }
 
-
 class CarPartsConfig {
   static const String BACKBONE = 'resnet101';
   static const List<int> BACKBONE_STRIDES = [4, 8, 16, 32, 64];
@@ -273,7 +272,8 @@ resizeImage(List image, {minDim, maxDim, minScale, mode = "square"}) {
 moldImage(image) {
   for (int i = 0; i < image.length; i++)
     for (int j = 0; j < image[i].length; j++)
-      for (int k = 0; k < 3; k++) image[i][j][k] -= CarPartsConfig.MEAN_PIXEL[k];
+      for (int k = 0; k < 3; k++)
+        image[i][j][k] -= CarPartsConfig.MEAN_PIXEL[k];
 
   return image;
 }
@@ -437,7 +437,7 @@ unmoldDetections(
       break;
     }
   }
-
+  print('N: $N');
   var boxes = [];
   var classIds = [];
   var scores = [];
@@ -528,13 +528,13 @@ unmoldMask(mask, bbox, imageShape) {
 
 displayInstances(List image, List boxes, List masks, List classIds, classNames,
     {scores, title, showMask = true, showBbox = true, colors, captions}) async {
-  print(image);
-  var N = boxes.shape[0];
-/*  if (N == 0) {
+  if (boxes.isEmpty) {
     print("No instances to display");
+    return;
   } else {
     assert((boxes.shape[0] == masks.shape[3]) == classIds.shape[0]);
-  }*/
+  }
+  var N = boxes.shape[0];
   if (colors == null) {
     colors = randomColors(N);
   }
