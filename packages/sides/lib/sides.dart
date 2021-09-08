@@ -14,6 +14,7 @@ import 'package:http_parser/http_parser.dart';
 import 'package:strings/strings.dart';
 import 'package:f_logs/f_logs.dart';
 import 'package:image/image.dart' as ImagePackage;
+import 'package:collection/collection.dart';
 
 class Img {
   File? file;
@@ -437,7 +438,6 @@ unmoldDetections(
       break;
     }
   }
-  print('N: $N');
   var boxes = [];
   var classIds = [];
   var scores = [];
@@ -471,6 +471,24 @@ unmoldDetections(
     }
   }
   boxes = denormBoxes(boxes, originalImageShape);
+  Function eq = const ListEquality().equals;
+  // print(eq(boxes[0], boxes[1]));
+  var boxesOutput = [];
+  var equals = false;
+  for (var box in boxes) {
+    for (var boxOut in boxesOutput) {
+      if (eq(box, boxOut)) {
+        equals = true;
+        break;
+      }
+    }
+    if (!equals)
+      boxesOutput.add(box);
+    else
+      equals = false;
+  }
+  boxes = boxesOutput;
+  N = boxes.length;
   List fullMasks = [];
   for (var i = 0; i < N; i++) {
     var fullMask = unmoldMask(masks[i], boxes[i], originalImageShape);
@@ -559,20 +577,20 @@ displayInstances(List image, List boxes, List masks, List classIds, classNames,
       var classId = classIds[i];
       var score = scores != null ? scores[i] : null;
       var label = CarPartsConfig.classNames[classId];
-      var caption = score != null ? '$label $score' : '$label';
+      var caption =
+          score != null ? '$label ${score.toStringAsFixed(3)}' : '$label';
       maskedImage = ImagePackage.drawString(
-          maskedImage, ImagePackage.arial_14, x1, y1 + 8, caption,
+          maskedImage, ImagePackage.arial_24, x1, y1 + 8, caption,
           color: color);
     }
     // TODO: Mask
   }
-  Directory appDocumentsDirectory = await getApplicationDocumentsDirectory();
-  String appDocumentsPath = appDocumentsDirectory.path;
+  Directory appCacheDirectory = await getTemporaryDirectory();
+  String appCachesPath = appCacheDirectory.path;
   var now = DateTime.now();
   var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
   String currentTimeStamp = formatter.format(now);
-  var filename = '$appDocumentsPath/$currentTimeStamp.png';
-  filename = '/storage/emulated/0/Download/$currentTimeStamp.png';
+  var filename = '$appCachesPath/$currentTimeStamp.png';
   await File(filename).writeAsBytes(ImagePackage.encodePng(maskedImage));
   return filename;
 }
@@ -591,10 +609,9 @@ predict(
     ImagePackage.Image
         image) async //Predicts the image using the pretrained model
 {
-  print('predict');
+  print('predict()');
   final interpreter = await tfl.Interpreter.fromAsset('car_parts.tflite');
   List imageList = bytesToArray(image);
-  print(imageList.shape);
   var moldOutput = moldInputs(imageList);
   List<List> moldedImages = moldOutput[0];
   List imageMetas = moldOutput[1];
@@ -604,7 +621,6 @@ predict(
   var outputTensors = interpreter.getOutputTensors();
   var outputShapes = [];
   outputTensors.forEach((tensor) {
-    print(tensor.shape);
     outputShapes.add(tensor.shape);
   });
 
@@ -619,28 +635,30 @@ predict(
     else
       outputs[i] = TensorBufferFloat(outputShapes[i]).buffer;
   }
-  print('start inference');
+  print('Start inference');
+  var inferenceTimeStart = DateTime.now().millisecondsSinceEpoch;
   interpreter.runForMultipleInputs(inputs, outputs);
   interpreter.close();
-  print('end inference');
+  var inferenceTimeElapsed =
+      DateTime.now().millisecondsSinceEpoch - inferenceTimeStart;
+  FLog.info(
+      className: "Sides",
+      methodName: "predict",
+      text: "Inference took ${inferenceTimeElapsed / 1000} secs");
+
+  print('End inference');
   List detectionsList = detections.getDoubleList().reshape(outputShapes[3]);
   List mrcnnMaskList = mrcnnMask.getDoubleList().reshape(outputShapes[4]);
-  print(detectionsList);
-  print(mrcnnMaskList);
-/*  var json_detections =
-      jsonDecode(await rootBundle.loadString('assets/detections.json'));
-  List detections = json_detections['detections'];
-  List mrcnnMask = json_detections['mrcnn_mask'];
-  List imageList = json_detections['image'];
-  List moldedImages = json_detections['molded_image'];
-  List windows = json_detections['windows'];
-  detections[2][4] = 0;*/
   var unmoldOutput = await unmoldDetections(detectionsList[0], mrcnnMaskList[0],
       imageList.shape, moldedImages[0].shape, windows[0]);
   var finalRois = unmoldOutput[0];
   var finalClassIds = unmoldOutput[1];
   var finalScores = unmoldOutput[2];
   var finalMasks = unmoldOutput[3];
+  FLog.info(
+      className: "Sides",
+      methodName: "predict",
+      text: "Found ${finalRois.length} instances");
   var filename = await displayInstances(bytesToArray(image), finalRois,
       finalMasks, finalClassIds, CarPartsConfig.classNames,
       scores: finalScores);
