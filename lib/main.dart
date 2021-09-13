@@ -11,7 +11,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:image/image.dart' as ImagePackage;
 import 'package:camera/camera.dart';
 import 'package:loader_overlay/loader_overlay.dart';
-
+import 'dart:typed_data';
 //All functions are in sides.dart -> packages/sides/lib/sides.dart
 
 class CameraInterface {
@@ -130,14 +130,17 @@ class _MyHomePageState extends State<MyHomePage> {
       return;
     }
     getImageRunning = true;
-    XFile file = await _pictureScreen.cameraInterface.controller.takePicture();
-    ImagePackage.Image image =
-        ImagePackage.decodeImage(File(file.path).readAsBytesSync())!;
-    context.loaderOverlay.show();
-    image = ImagePackage.copyResizeCropSquare(image, 512);
-    image = ImagePackage.copyRotate(image, 90);
+    ByteData imageData = await rootBundle.load('assets/car_800_552.jpg');
+    List<int> bytes = Uint8List.view(imageData.buffer);
+    ImagePackage.Image image = ImagePackage.decodeImage(bytes)!;
+    // XFile file = await _pictureScreen.cameraInterface.controller.takePicture();
+    // ImagePackage.Image image =
+    //     ImagePackage.decodeImage(File(file.path).readAsBytesSync())!;
+    // context.loaderOverlay.show();
+    // image = ImagePackage.copyResizeCropSquare(image, 512);
+    // image = ImagePackage.copyRotate(image, 90);
     filename = await predict(image);
-    context.loaderOverlay.hide();
+    // context.loaderOverlay.hide();
     if (filename != null)
       setState(() {
         _onItemTapped(1);
@@ -346,21 +349,7 @@ class ImagePreviewPageState extends State<ImagePreviewPage>
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
             try {
-              return Stack(alignment: FractionalOffset.center, children: [
-                Positioned.fill(
-                    child: AspectRatio(
-                        aspectRatio:
-                            widget.cameraInterface.controller.value.aspectRatio,
-                        child:
-                            CameraPreview(widget.cameraInterface.controller))),
-                Container(
-                  width: width,
-                  height: width,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.greenAccent, width: 4),
-                  ),
-                ),
-              ]);
+              return CameraPreview(widget.cameraInterface.controller);
             } catch (e) {
               FLog.error(
                   className: "ImagePreviewPageState",

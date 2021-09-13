@@ -1,20 +1,21 @@
 library sides;
 
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-import 'dart:convert';
+
+import 'package:collection/collection.dart';
+import 'package:f_logs/f_logs.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:tflite_flutter/tflite_flutter.dart' as tfl;
-import 'package:tflite_flutter_helper/tflite_flutter_helper.dart';
-import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
-import 'package:strings/strings.dart';
-import 'package:f_logs/f_logs.dart';
 import 'package:image/image.dart' as ImagePackage;
-import 'package:collection/collection.dart';
+import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:strings/strings.dart';
+import 'package:tflite_flutter/tflite_flutter.dart' as tfl;
+import 'package:tflite_flutter_helper/tflite_flutter_helper.dart';
 
 class Img {
   File? file;
@@ -202,15 +203,15 @@ backup() async {
   }
 }
 
-bytesToArray(ImagePackage.Image image) {
+List bytesToArray(ImagePackage.Image image) {
   List rgbImage = image.getBytes(format: ImagePackage.Format.rgb);
   // rgbImage = List.generate(rgbImage.length, (i) => rgbImage[i].toDouble());
   rgbImage = rgbImage.reshape([image.height, image.width, 3]);
   return rgbImage;
 }
 
-moldInputs(List image) {
-  var resizeOutput = resizeImage(image,
+moldInputs(ImagePackage.Image image) async {
+  var resizeOutput = await resizeImage(image,
       minDim: CarPartsConfig.IMAGE_MIN_DIM,
       maxDim: CarPartsConfig.IMAGE_MAX_DIM,
       minScale: CarPartsConfig.IMAGE_MIN_SCALE,
@@ -222,8 +223,8 @@ moldInputs(List image) {
   // var crop = resizeOutput[4];
   moldedImage = moldImage(moldedImage);
   var zerosList = List.filled(CarPartsConfig.NUM_CLASSES, 0);
-  List imageMeta = composeImageMeta(
-      0, image.shape, moldedImage.shape, window, scale, zerosList);
+  List imageMeta = composeImageMeta(0, [image.height, image.width, 3],
+      moldedImage.shape, window, scale, zerosList);
   return [
     [moldedImage],
     [imageMeta],
@@ -231,12 +232,14 @@ moldInputs(List image) {
   ];
 }
 
-resizeImage(List image, {minDim, maxDim, minScale, mode = "square"}) {
-  var h = image.shape[0];
-  var w = image.shape[1];
+resizeImage(ImagePackage.Image image,
+    {minDim, maxDim, minScale, mode = "square"}) async {
+  var h = image.height;
+  var w = image.width;
+  List imageList = bytesToArray(image);
 
   var window = [0, 0, h, w];
-  var scale = 1;
+  var scale = 1.0;
   var padding = [
     [0, 0],
     [0, 0],
@@ -247,27 +250,62 @@ resizeImage(List image, {minDim, maxDim, minScale, mode = "square"}) {
   if (mode == "none") return [image, window, scale, padding, crop];
   // TODO: resize
   // Scale?
-  // if (minDim != null)
-  //   // Scale up but not down
-  //   scale = max(1, minDim / min(h, w));
-  // if (minScale != null && scale < minScale) scale = minScale;
-
+  if (minDim != null)
+    // Scale up but not down
+    scale = max(1, minDim / min(h, w));
+  if (minScale != null && scale < minScale) scale = minScale;
   // Does it exceed max dim?
-  // var imageMax;
-  // if (maxDim != null && mode == "square") {
-  //   imageMax = max(h, w);
-  //   if ((imageMax * scale) > maxDim) scale = maxDim / imageMax;
-  // }
-  //
-  // if(mode == "square")
-  //   {
-  //     var topPad = (maxDim - h) ~/ 2;
-  //     var bottomPad = maxDim - h - topPad;
-  //     var leftPad = (maxDim - w) ~/ 2;
-  //     var rightPad = maxDim - w - leftPad;
-  //     padding = [[topPad, bottomPad], [leftPad, rightPad], [0, 0]];
-  //   }
-  return [image, window, scale, padding, crop];
+  var imageMax;
+
+  if (maxDim != null && mode == "square") {
+    imageMax = max(h, w);
+    if ((imageMax * scale) > maxDim) scale = maxDim / imageMax;
+  }
+
+  if (scale != 1) {
+    image = ImagePackage.copyResize(image,
+        width: (w * scale).round(), height: (h * scale).round());
+  }
+
+  if (mode == "square") {
+    var h = image.height;
+    var w = image.width;
+    int topPad = (maxDim - h) ~/ 2;
+    var bottomPad = maxDim - h - topPad;
+    int leftPad = (maxDim - w) ~/ 2;
+    var rightPad = maxDim - w - leftPad;
+    padding = [
+      [topPad, bottomPad],
+      [leftPad, rightPad],
+      [0, 0]
+    ];
+    imageList = bytesToArray(image);
+    imageList = addPadding(imageList, padding);
+    image = ImagePackage.Image.fromBytes(maxDim, maxDim, imageList.flatten(),
+        format: ImagePackage.Format.rgb);
+    // await File('/storage/emulated/0/Download/testimage.png').writeAsBytes(ImagePackage.encodePng(image));
+    window = [topPad, leftPad, h + topPad, w + leftPad];
+  }
+  imageList = imageList.flatten();
+  imageList = List.generate(imageList.length, (i) => imageList[i].toDouble());
+  imageList = imageList.reshape([maxDim, maxDim, 3]);
+  return [imageList, window, scale, padding, crop];
+}
+
+addPadding(List image, List<List> padding) {
+  var w = image.shape[1];
+  if (padding[0].any((element) => element != 0)) {
+    for (var i = 0; i < padding[0][0]; i++)
+      image.insert(0, List.filled(w, [0, 0, 0]));
+    for (var i = 0; i < padding[0][1]; i++)
+      image.add(List.filled(w, [0, 0, 0]));
+  } else if (padding[1].any((element) => element != 0)) {
+    for (var i = 0; i < padding[1][0]; i++)
+      image.forEach((element) => element.insert(0, [0, 0, 0]));
+    for (var i = 0; i < padding[0][1]; i++)
+      image.forEach((element) => element.add([0, 0, 0]));
+  }
+  return image;
 }
 
 moldImage(image) {
@@ -430,7 +468,7 @@ normBoxes(boxes, shape) {
 }
 
 unmoldDetections(
-    detections, List mrcnnMask, originalImageShape, imageShape, window) {
+    detections, List mrcnnMask, originalImageShape, imageShape, window) async {
   var N = detections.length;
   for (var i = 0; i < detections.length; i++) {
     if (detections[i][4] == 0) {
@@ -472,7 +510,6 @@ unmoldDetections(
   }
   boxes = denormBoxes(boxes, originalImageShape);
   Function eq = const ListEquality().equals;
-  // print(eq(boxes[0], boxes[1]));
   var boxesOutput = [];
   var equals = false;
   for (var box in boxes) {
@@ -491,17 +528,17 @@ unmoldDetections(
   N = boxes.length;
   List fullMasks = [];
   for (var i = 0; i < N; i++) {
-    var fullMask = unmoldMask(masks[i], boxes[i], originalImageShape);
+    var fullMask = await unmoldMask(masks[i], boxes[i], originalImageShape);
     fullMasks.add(fullMask);
   }
-  var fullMasksStack = [];
+/*  var fullMasksStack = [];
   if (fullMasks.isNotEmpty) {
     print('fullMasks not empty');
-    for (var i = 0; i < fullMasks[0].length; i++) {
+    for (var i = 0; i < fullMasks.shape[1]; i++) {
       var tempList2 = [];
-      for (var j = 0; j < fullMasks[0][0].length; j++) {
+      for (var j = 0; j < fullMasks.shape[2]; j++) {
         var tempList = [];
-        for (var k = 0; k < fullMasks.length; k++) {
+        for (var k = 0; k < fullMasks.shape[0]; k++) {
           tempList.add(fullMasks[k][i][j]);
         }
         tempList2.add(tempList);
@@ -510,8 +547,8 @@ unmoldDetections(
     }
   } else {
     print('fullMasks empty :(');
-  }
-  return [boxes, classIds, scores, fullMasksStack];
+  }*/
+  return [boxes, classIds, scores, fullMasks];
 }
 
 denormBoxes(List boxes, shape) {
@@ -527,26 +564,47 @@ denormBoxes(List boxes, shape) {
   return boxes;
 }
 
-unmoldMask(mask, bbox, imageShape) {
-  // var threshold = 0.5;
-  // var y1 = bbox[0];
-  // var x1 = bbox[1];
-  // var y2 = bbox[2];
-  // var x2 = bbox[3];
+unmoldMask(List mask, bbox, imageShape) async {
+  var threshold = 0.5;
+  int y1 = bbox[0];
+  int x1 = bbox[1];
+  int y2 = bbox[2];
+  int x2 = bbox[3];
   // TODO: resize mask
-  var fullMask = List.generate(imageShape[0],
-      (index) => List<bool>.generate(imageShape[1], (index) => false));
-/*  for (var i = y1; i < y2; i++) {
-    for (var j = x1; j < x2; j++) {
-      fullMask[i][j] = mask[i - y1][j - x1];
+  var boolMask = List.generate(
+      mask.shape[0],
+      (i) => List.generate(mask.shape[1],
+          (j) => mask[i][j] >= threshold ? [255, 255, 255] : [0, 0, 0]));
+  var maskImage = ImagePackage.Image.fromBytes(
+      mask.shape[0], mask.shape[1], boolMask.flatten(),
+      format: ImagePackage.Format.rgb);
+  maskImage =
+      ImagePackage.copyResize(maskImage, width: x2 - x1, height: y2 - y1);
+  mask = bytesToArray(maskImage);
+  var binaryMask = [];
+  Function eq = const ListEquality().equals;
+  for (var i = 0; i < mask.shape[0]; i++) {
+    for (var j = 0; j < mask.shape[1]; j++) {
+      if (eq(mask[i][j], [0, 0, 0]))
+        binaryMask.add(false);
+      else
+        binaryMask.add(true);
     }
-  }*/
+  }
+  binaryMask = binaryMask.reshape([mask.shape[0], mask.shape[1]]);
+  var fullMask = List.generate(
+      imageShape[0],
+      (i) => List.generate(
+          imageShape[1],
+          (j) => (i >= y1 && i < y2 && j >= x1 && j < x2)
+              ? binaryMask[i - y1][j - x1]
+              : false));
+
   return fullMask;
 }
 
 displayInstances(List image, List boxes, List masks, List classIds, classNames,
     {scores, title, showMask = true, showBbox = true, colors, captions}) async {
-  print(boxes);
   if (boxes.isEmpty) {
     print("No instances to display");
     return;
@@ -563,7 +621,9 @@ displayInstances(List image, List boxes, List masks, List classIds, classNames,
       width, height, image.flatten(),
       format: ImagePackage.Format.rgb);
   for (var i = 0; i < N; i++) {
-    var color = colors[i];
+    Color color = colors[i];
+    print('color value ${color.value}');
+    print('color rgb ${color.red} ${color.green} ${color.blue}');
     //     if not np.any(boxes[i]):
     // # Skip this instance. Has no bbox. Likely lost in image cropping.
     // continue
@@ -572,7 +632,12 @@ displayInstances(List image, List boxes, List masks, List classIds, classNames,
     var y2 = boxes[i][2];
     var x2 = boxes[i][3];
 
-    maskedImage = ImagePackage.drawRect(maskedImage, x1, y1, x2, y2, color);
+    maskedImage = ImagePackage.drawRect(maskedImage, x1, y1, x2, y2,
+        ImagePackage.getColor(color.red, color.green, color.blue));
+
+    var mask = masks[i];
+    if (showMask) maskedImage = applyMask(maskedImage, mask, color);
+
     if (captions == null) {
       var classId = classIds[i];
       var score = scores != null ? scores[i] : null;
@@ -580,10 +645,8 @@ displayInstances(List image, List boxes, List masks, List classIds, classNames,
       var caption =
           score != null ? '$label ${score.toStringAsFixed(3)}' : '$label';
       maskedImage = ImagePackage.drawString(
-          maskedImage, ImagePackage.arial_24, x1, y1 + 8, caption,
-          color: color);
+          maskedImage, ImagePackage.arial_24, x1, y1 + 8, caption);
     }
-    // TODO: Mask
   }
   Directory appCacheDirectory = await getTemporaryDirectory();
   String appCachesPath = appCacheDirectory.path;
@@ -599,10 +662,26 @@ randomColors(N, [bright = true]) {
   var brightness = bright ? 1.0 : 0.7;
   var hsv = List.generate(
       N, (i) => HSVColor.fromAHSV(1.0, i / N * 360.0, 1.0, brightness));
-  var rgb = List.generate(N, (i) => hsv[i].toColor().value);
+  var rgb = List.generate(N, (i) => hsv[i].toColor());
   // var rgb = List.generate(N, (i) =>[hsv[i].toColor().red, hsv[i].toColor().green, hsv[i].toColor().blue]);
   rgb.shuffle();
   return rgb;
+}
+
+ImagePackage.Image applyMask(
+    ImagePackage.Image maskedImage, List mask, Color color,
+    {alpha = 0.5}) {
+  var maskImageList = List.generate(
+      mask.shape[0],
+      (i) => List.generate(
+          mask.shape[1],
+          (j) => mask[i][j]
+              ? [color.red, color.green, color.blue, (255 * alpha).toInt()]
+              : [0, 0, 0, 0]));
+  var maskImage = ImagePackage.Image.fromBytes(
+      mask.shape[1], mask.shape[0], maskImageList.flatten());
+  maskedImage = ImagePackage.drawImage(maskedImage, maskImage);
+  return maskedImage;
 }
 
 predict(
@@ -611,8 +690,7 @@ predict(
 {
   print('predict()');
   final interpreter = await tfl.Interpreter.fromAsset('car_parts.tflite');
-  List imageList = bytesToArray(image);
-  var moldOutput = moldInputs(imageList);
+  var moldOutput = await moldInputs(image);
   List<List> moldedImages = moldOutput[0];
   List imageMetas = moldOutput[1];
   List windows = moldOutput[2];
@@ -650,7 +728,7 @@ predict(
   List detectionsList = detections.getDoubleList().reshape(outputShapes[3]);
   List mrcnnMaskList = mrcnnMask.getDoubleList().reshape(outputShapes[4]);
   var unmoldOutput = await unmoldDetections(detectionsList[0], mrcnnMaskList[0],
-      imageList.shape, moldedImages[0].shape, windows[0]);
+      bytesToArray(image).shape, moldedImages[0].shape, windows[0]);
   var finalRois = unmoldOutput[0];
   var finalClassIds = unmoldOutput[1];
   var finalScores = unmoldOutput[2];

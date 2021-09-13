@@ -34,6 +34,7 @@ android {
     aaptOptions {
         noCompress 'tflite'
         noCompress 'lite'
+        noCompress 'json'
     }
 
     defaultConfig {
