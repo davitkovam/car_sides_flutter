@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:sides/sides.dart';
 import 'package:f_logs/f_logs.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:flutter/services.dart' show rootBundle;
+// import 'package:path_provider/path_provider.dart';
+// import 'package:flutter/services.dart' show rootBundle;
 import 'package:image/image.dart' as ImagePackage;
 import 'package:camera/camera.dart';
 import 'package:loader_overlay/loader_overlay.dart';
@@ -48,8 +48,8 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   late CameraController controller;
   String? filename;
-  String imageName = 'car_800_552.jpg';
   bool getImageRunning = false;
+
   int _selectedIndex = 0;
   PageController pageController = PageController(
     initialPage: 0,
@@ -111,32 +111,16 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
   }
 
-  Future<File> getImageFileFromAssets(String path) async {
-    final byteData = await rootBundle.load('assets/$path');
-
-    final file = File('${(await getTemporaryDirectory()).path}/$path');
-    await file.writeAsBytes(byteData.buffer
-        .asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
-
-    return file;
-  }
-
-//Take a picture
   Future getImage() async {
     if (!controller.value.isInitialized || getImageRunning) {
       return;
     }
     getImageRunning = true;
-    // ByteData imageData = await rootBundle.load('assets/car_800_552.jpg');
-    // List<int> bytes = Uint8List.view(imageData.buffer);
-    // ImagePackage.Image image = ImagePackage.decodeImage(bytes)!;
     XFile file = await controller.takePicture();
     ImagePackage.Image image =
         ImagePackage.decodeImage(File(file.path).readAsBytesSync())!;
-    print('image res: ${image.width}x${image.height}');
-    context.loaderOverlay.show();
-    // image = ImagePackage.copyResizeCropSquare(image, 512);
     image = ImagePackage.copyRotate(image, 90);
+    context.loaderOverlay.show();
     filename = await predict(image);
     context.loaderOverlay.hide();
     if (filename != null)
@@ -181,33 +165,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
   }
 
-  Widget buildPageView() {
-    return PageView(
-      controller: pageController,
-      physics: NeverScrollableScrollPhysics(),
-      onPageChanged: _pageChanged,
-      children: <Widget>[cameraPage(), mrcnnPage()],
-    );
-  }
-
-  Widget mrcnnPage() {
-    return Container(
-        child: (filename == null
-            ? Icon(
-                Icons.image_not_supported,
-                size: 100,
-              )
-            : Image.file(File(filename!))));
-  }
-
-  Widget cameraPage() {
-    return Container(
-        color: Colors.black,
-        child: controller.value.isInitialized
-            ? CameraPreview(controller)
-            : Container());
-  }
-
   void _pageChanged(int index) {
     setState(() {
       _selectedIndex = index;
@@ -244,4 +201,32 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     else
       return null;
   }
+
+  Widget buildPageView() {
+    return PageView(
+      controller: pageController,
+      physics: NeverScrollableScrollPhysics(),
+      onPageChanged: _pageChanged,
+      children: <Widget>[cameraPage(), mrcnnPage()],
+    );
+  }
+
+  Widget mrcnnPage() {
+    return Container(
+        child: (filename == null
+            ? Icon(
+          Icons.image_not_supported,
+          size: 100,
+        )
+            : Image.file(File(filename!))));
+  }
+
+  Widget cameraPage() {
+    return Container(
+        color: Colors.black,
+        child: controller.value.isInitialized
+            ? CameraPreview(controller)
+            : Container());
+  }
+
 }

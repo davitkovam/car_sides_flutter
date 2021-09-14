@@ -92,61 +92,16 @@ class CarSides {
 }
 
 class CarPartsConfig {
-  static const String BACKBONE = 'resnet101';
   static const List<int> BACKBONE_STRIDES = [4, 8, 16, 32, 64];
-  static const int BATCH_SIZE = 1;
-  static const List<double> BBOX_STD_DEV = [0.1, 0.1, 0.2, 0.2];
-
-  // static COMPUTE_BACKBONE_SHAPE = None;
-  static const int DETECTION_MAX_INSTANCES = 100;
-  static const double DETECTION_MIN_CONFIDENCE = 0.7;
-  static const double DETECTION_NMS_THRESHOLD = 0.3;
-  static const int FPN_CLASSIF_FC_LAYERS_SIZ = 1024;
-  static const int GPU_COUNT = 1;
-  static const double GRADIENT_CLIP_NORM = 5.0;
-  static const int IMAGES_PER_GPU = 1;
-  static const int IMAGE_CHANNEL_COUNT = 3;
   static const int IMAGE_MAX_DIM = 512;
-  static const int IMAGE_META_SIZE = 31;
   static const int IMAGE_MIN_DIM = 512;
   static const int IMAGE_MIN_SCALE = 0;
   static const String IMAGE_RESIZE_MODE = 'square';
-  static const List<int> IMAGE_SHAPE = [512, 512, 3];
-  static const double LEARNING_MOMENTUM = 0.9;
-  static const double LEARNING_RATE = 0.001;
-  static const Map<String, double> LOSS_WEIGHTS = {
-    'rpn_class_loss': 1.0,
-    'rpn_bbox_loss': 1.0,
-    'mrcnn_class_loss': 1.0,
-    'mrcnn_bbox_loss': 1.0,
-    'mrcnn_mask_loss': 1.0
-  };
-  static const int MASK_POOL_SIZE = 14;
-  static const List<int> MASK_SHAPE = [28, 28];
-  static const int MAX_GT_INSTANCES = 100;
   static const List<double> MEAN_PIXEL = [123.7, 116.8, 103.9];
-  static const List<int> MINI_MASK_SHAPE = [56, 56];
-  static const String NAME = 'car_part';
   static const int NUM_CLASSES = 19;
-  static const int POOL_SIZE = 7;
-  static const int POST_NMS_ROIS_INFERENCE = 1000;
-  static const int POST_NMS_ROIS_TRAINING = 2000;
-  static const int PRE_NMS_LIMIT = 6000;
-  static const double ROI_POSITIVE_RATIO = 0.33;
   static const List<double> RPN_ANCHOR_RATIOS = [0.5, 1, 2];
   static const List<double> RPN_ANCHOR_SCALES = [8, 16, 32, 64, 128];
   static const int RPN_ANCHOR_STRIDE = 1;
-  static const List<double> RPN_BBOX_STD_DEV = [0.1, 0.1, 0.2, 0.2];
-  static const double RPN_NMS_THRESHOLD = 0.7;
-  static const int RPN_TRAIN_ANCHORS_PER_IMAGE = 256;
-  static const int STEPS_PER_EPOCH = 1000;
-  static const int TOP_DOWN_PYRAMID_SIZE = 256;
-  static const bool TRAIN_BN = false;
-  static const int TRAIN_ROIS_PER_IMAGE = 200;
-  static const bool USE_MINI_MASK = true;
-  static const bool USE_RPN_ROIS = true;
-  static const int VALIDATION_STEPS = 50;
-  static const double WEIGHT_DECAY = 0.0001;
   static const List classNames = [
     'BG',
     'back_bumper',
