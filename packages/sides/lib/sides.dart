@@ -419,6 +419,9 @@ List unmoldDetections(
   var classIds = [];
   var scores = [];
   List masks = [];
+
+  if (N == 0) return [boxes, classIds, scores, masks];
+
   for (var i = 0; i < N; i++) {
     boxes.add(List.generate(4, (j) => detections[i][j]));
     classIds.add(detections[i][4].toInt());
@@ -680,8 +683,7 @@ Future<bool> internetAvailable() async {
 }
 
 Future<bool> uploadImage(
-    File image, CarSides predictedSide, CarSides realSide) async
-{
+    File image, CarSides predictedSide, CarSides realSide) async {
   if (await internetAvailable()) {
     var now = DateTime.now();
     var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
