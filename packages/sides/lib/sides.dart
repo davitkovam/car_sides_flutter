@@ -47,7 +47,7 @@ class Img {
     await init();
   }
 
-  Future init() async {
+  init() async {
     size = await getFileSize(file!, 2);
   }
 
@@ -170,48 +170,14 @@ class CarPartsConfig {
   ];
 }
 
-backup() async {
-  FLog.info(className: "Sides", methodName: "Backup", text: "Backing Up");
-  var dir = await getExternalStorageDirectory();
-  if (dir != null) {
-    FLog.info(
-        className: "Sides", methodName: "Backup", text: "Directory: $dir");
-    dir.list(recursive: false).forEach((f) async {
-      if (f.path.contains(".jpg")) {
-        FLog.info(className: "Sides", methodName: "Backup", text: "f: $f");
-        var pred = '${f.path.split("/")[f.path.split("/").length - 1][0]}'
-            .toUpperCase();
-        var real = '${f.path.split("/")[f.path.split("/").length - 1][1]}'
-            .toUpperCase();
-        FLog.info(
-            className: "Sides",
-            methodName: "Backup",
-            text: "pred: $pred, real: $real");
-        File fi = File(f.path);
-        var uploaded = false;
-        uploaded = await uploadImage(
-            fi, new CarSides.fromLetter(pred), new CarSides.fromLetter(real));
-        if (uploaded == true) {
-          FLog.info(
-              className: "Sides",
-              methodName: "Backup",
-              text: "Uploaded, deleted");
-          await fi.delete();
-        }
-      }
-    });
-  }
-}
-
-List bytesToArray(ImagePackage.Image image) {
+List imageTo3DList(ImagePackage.Image image) {
   List rgbImage = image.getBytes(format: ImagePackage.Format.rgb);
-  // rgbImage = List.generate(rgbImage.length, (i) => rgbImage[i].toDouble());
   rgbImage = rgbImage.reshape([image.height, image.width, 3]);
   return rgbImage;
 }
 
-moldInputs(ImagePackage.Image image) async {
-  var resizeOutput = await resizeImage(image,
+List moldInputs(ImagePackage.Image image) {
+  var resizeOutput = resizeImage(image,
       minDim: CarPartsConfig.IMAGE_MIN_DIM,
       maxDim: CarPartsConfig.IMAGE_MAX_DIM,
       minScale: CarPartsConfig.IMAGE_MIN_SCALE,
@@ -223,7 +189,7 @@ moldInputs(ImagePackage.Image image) async {
   // var crop = resizeOutput[4];
   moldedImage = moldImage(moldedImage);
   var zerosList = List.filled(CarPartsConfig.NUM_CLASSES, 0);
-  List imageMeta = composeImageMeta(0, [image.height, image.width, 3],
+  var imageMeta = composeImageMeta(0, [image.height, image.width, 3],
       moldedImage.shape, window, scale, zerosList);
   return [
     [moldedImage],
@@ -232,11 +198,11 @@ moldInputs(ImagePackage.Image image) async {
   ];
 }
 
-resizeImage(ImagePackage.Image image,
-    {minDim, maxDim, minScale, mode = "square"}) async {
+List resizeImage(ImagePackage.Image image,
+    {minDim, maxDim, minScale, mode = "square"}) {
   var h = image.height;
   var w = image.width;
-  List imageList = bytesToArray(image);
+  List imageList = imageTo3DList(image);
 
   var window = [0, 0, h, w];
   var scale = 1.0;
@@ -248,7 +214,7 @@ resizeImage(ImagePackage.Image image,
   var crop;
 
   if (mode == "none") return [image, window, scale, padding, crop];
-  // TODO: resize
+
   // Scale?
   if (minDim != null)
     // Scale up but not down
@@ -261,10 +227,13 @@ resizeImage(ImagePackage.Image image,
     imageMax = max(h, w);
     if ((imageMax * scale) > maxDim) scale = maxDim / imageMax;
   }
-
   if (scale != 1) {
-    image = ImagePackage.copyResize(image,
-        width: (w * scale).round(), height: (h * scale).round());
+    if (imageMax == h) {
+      image = ImagePackage.copyResize(image, width: minDim);
+    } else {
+      image = ImagePackage.copyResize(image, height: minDim);
+    }
+    image = ImagePackage.copyRotate(image, -90);
   }
 
   if (mode == "square") {
@@ -279,11 +248,8 @@ resizeImage(ImagePackage.Image image,
       [leftPad, rightPad],
       [0, 0]
     ];
-    imageList = bytesToArray(image);
+    imageList = imageTo3DList(image);
     imageList = addPadding(imageList, padding);
-    image = ImagePackage.Image.fromBytes(maxDim, maxDim, imageList.flatten(),
-        format: ImagePackage.Format.rgb);
-    // await File('/storage/emulated/0/Download/testimage.png').writeAsBytes(ImagePackage.encodePng(image));
     window = [topPad, leftPad, h + topPad, w + leftPad];
   }
   imageList = imageList.flatten();
@@ -292,7 +258,7 @@ resizeImage(ImagePackage.Image image,
   return [imageList, window, scale, padding, crop];
 }
 
-addPadding(List image, List<List> padding) {
+List addPadding(List image, List padding) {
   var w = image.shape[1];
   if (padding[0].any((element) => element != 0)) {
     for (var i = 0; i < padding[0][0]; i++)
@@ -302,13 +268,13 @@ addPadding(List image, List<List> padding) {
   } else if (padding[1].any((element) => element != 0)) {
     for (var i = 0; i < padding[1][0]; i++)
       image.forEach((element) => element.insert(0, [0, 0, 0]));
-    for (var i = 0; i < padding[0][1]; i++)
+    for (var i = 0; i < padding[1][1]; i++)
       image.forEach((element) => element.add([0, 0, 0]));
   }
   return image;
 }
 
-moldImage(image) {
+List moldImage(List image) {
   for (int i = 0; i < image.length; i++)
     for (int j = 0; j < image[i].length; j++)
       for (int k = 0; k < 3; k++)
@@ -317,7 +283,7 @@ moldImage(image) {
   return image;
 }
 
-composeImageMeta(
+List composeImageMeta(
     imageId, originalImageShape, imageShape, window, scale, activeClassIds) {
   var meta = [imageId] +
       originalImageShape +
@@ -329,7 +295,7 @@ composeImageMeta(
   return meta;
 }
 
-getAnchors(List imageShape) async {
+Future<List> getAnchors(List imageShape) async {
   Directory appDocumentsDirectory = await getApplicationDocumentsDirectory();
   String appDocumentsPath = appDocumentsDirectory.path;
 
@@ -354,8 +320,8 @@ getAnchors(List imageShape) async {
   return anchors;
 }
 
-computeBackboneShapes(List imageShape, List<int> backboneStrides) {
-  List output = [];
+List computeBackboneShapes(List imageShape, List<int> backboneStrides) {
+  var output = [];
   for (int value in backboneStrides)
     output
         .add([(imageShape[0] / value).ceil(), (imageShape[1] / value).ceil()]);
@@ -363,7 +329,7 @@ computeBackboneShapes(List imageShape, List<int> backboneStrides) {
   return output;
 }
 
-generatePyramidAnchors(List scales, List ratios, List featureShapes,
+List generatePyramidAnchors(List scales, List ratios, List featureShapes,
     featureStrides, int anchorStride) {
   var anchors = [];
   for (var i = 0; i < scales.length; i++) {
@@ -377,7 +343,7 @@ generatePyramidAnchors(List scales, List ratios, List featureShapes,
   return pyramidAnchors;
 }
 
-generateAnchors(scales, ratios, shape, featureStride, int anchorStride) {
+List generateAnchors(scales, ratios, shape, featureStride, int anchorStride) {
   scales = List.generate(ratios.length, (index) => scales);
 
   var heights =
@@ -391,84 +357,57 @@ generateAnchors(scales, ratios, shape, featureStride, int anchorStride) {
   for (var i = 0; i < shape[1]; i += anchorStride) {
     shiftsX.add(i * featureStride);
   }
-  var meshGridOut = meshGrid(shiftsX, shiftsY);
-  shiftsX = meshGridOut[0];
-  shiftsY = meshGridOut[1];
-  var meshGridOutX = meshGrid(widths, shiftsX);
-  List boxWidths = meshGridOutX[0];
-  List boxCentersX = meshGridOutX[1];
-
-  var meshGridOutY = meshGrid(heights, shiftsY);
-  List boxHeights = meshGridOutY[0];
-  List boxCentersY = meshGridOutY[1];
-
-  List boxCenters = stackAxis2(boxCentersY, boxCentersX);
-  List boxSizes = stackAxis2(boxHeights, boxWidths);
-  var boxes = concatenateAxis1(boxCenters, boxSizes);
+  var shiftsXY = meshGrid(shiftsX, shiftsY);
+  var boxWidthsCentersX = meshGrid(widths, shiftsXY[0]);
+  var boxHeightsCentersY = meshGrid(heights, shiftsXY[1]);
+  var boxCenters = stack(boxHeightsCentersY[1], boxWidthsCentersX[1]);
+  var boxSizes = stack(boxHeightsCentersY[0], boxWidthsCentersX[0]);
+  var boxes = concatenate(boxCenters, boxSizes);
   return boxes;
 }
 
-meshGrid(List x, List y) {
-  var outputX = [];
-  var outputY = [];
-
+List meshGrid(List x, List y) {
   var flattenX = x.flatten();
   var flattenY = y.flatten();
-
-  for (var i = 0; i < flattenY.length; i++) {
-    var tempX = [];
-    var tempY = [];
-    for (var j = 0; j < flattenX.length; j++) {
-      tempX.add(flattenX[j]);
-      tempY.add(flattenY[i]);
-    }
-    outputX.add(tempX);
-    outputY.add(tempY);
-  }
+  var outputX = List.generate(flattenY.length,
+      (i) => List.generate(flattenX.length, (j) => flattenX[j]));
+  var outputY = List.generate(flattenY.length,
+      (i) => List.generate(flattenX.length, (j) => flattenY[i]));
   return [outputX, outputY];
 }
 
-stackAxis2(List x, List y) {
-  List output = [];
-  for (var i = 0; i < x.length; i++) {
-    for (var j = 0; j < x[i].length; j++) output.add([x[i][j], y[i][j]]);
-  }
-  return output;
-}
-
-concatenateAxis1(List x, List y) {
+List stack(List x, List y, {axis = 2}) {
   var output = [];
-  for (var i = 0; i < x.length; i++) {
-    var temp = [];
-    for (var j = 0; j < x[i].length; j++) {
-      temp.add(x[i][j] - 0.5 * y[i][j]);
-    }
-    for (var j = 0; j < x[i].length; j++) {
-      temp.add(x[i][j] + 0.5 * y[i][j]);
-    }
-    output.add(temp);
+  for (var i = 0; i < x.shape[0]; i++)
+    for (var j = 0; j < x.shape[1]; j++) output.add([x[i][j], y[i][j]]);
+
+  return output;
+}
+
+List concatenate(List x, List y, {axis = 1}) {
+  var output = [];
+  for (var i = 0; i < x.shape[0]; i++) {
+    output.add(List.generate(x.shape[1], (j) => x[i][j] - 0.5 * y[i][j]) +
+        List.generate(x.shape[1], (j) => x[i][j] + 0.5 * y[i][j]));
   }
   return output;
 }
 
-normBoxes(boxes, shape) {
+List normBoxes(boxes, shape) {
   var h = shape[0];
   var w = shape[1];
   var scale = [h - 1, w - 1, h - 1, w - 1];
   var shift = [0, 0, 1, 1];
   var output = [];
   for (var box in boxes) {
-    var temp = [];
-    for (var i = 0; i < box.length; i++) {
-      temp.add((box[i] - shift[i]) / scale[i]);
-    }
-    output.add(temp);
+    output
+        .add(List.generate(box.length, (i) => (box[i] - shift[i]) / scale[i]));
   }
   return output;
 }
 
-unmoldDetections(
-    detections, List mrcnnMask, originalImageShape, imageShape, window) async {
+List unmoldDetections(
+    detections, List mrcnnMask, originalImageShape, imageShape, window) {
   var N = detections.length;
   for (var i = 0; i < detections.length; i++) {
     if (detections[i][4] == 0) {
@@ -481,7 +420,7 @@ unmoldDetections(
   var scores = [];
   List masks = [];
   for (var i = 0; i < N; i++) {
-    boxes.add(List.generate(4, (index) => detections[i][index]));
+    boxes.add(List.generate(4, (j) => detections[i][j]));
     classIds.add(detections[i][4].toInt());
     scores.add(detections[i][5]);
     var tempList = [];
@@ -503,8 +442,8 @@ unmoldDetections(
   var wh = wy2 - wy1;
   var ww = wx2 - wx1;
   var scale = [wh, ww, wh, ww];
-  for (var i = 0; i < boxes.length; i++) {
-    for (var j = 0; j < boxes[i].length; j++) {
+  for (var i = 0; i < boxes.shape[0]; i++) {
+    for (var j = 0; j < boxes.shape[1]; j++) {
       boxes[i][j] = (boxes[i][j] - shift[j]) / scale[j];
     }
   }
@@ -528,49 +467,31 @@ unmoldDetections(
   N = boxes.length;
   List fullMasks = [];
   for (var i = 0; i < N; i++) {
-    var fullMask = await unmoldMask(masks[i], boxes[i], originalImageShape);
+    var fullMask = unmoldMask(masks[i], boxes[i], originalImageShape);
     fullMasks.add(fullMask);
   }
-/*  var fullMasksStack = [];
-  if (fullMasks.isNotEmpty) {
-    print('fullMasks not empty');
-    for (var i = 0; i < fullMasks.shape[1]; i++) {
-      var tempList2 = [];
-      for (var j = 0; j < fullMasks.shape[2]; j++) {
-        var tempList = [];
-        for (var k = 0; k < fullMasks.shape[0]; k++) {
-          tempList.add(fullMasks[k][i][j]);
-        }
-        tempList2.add(tempList);
-      }
-      fullMasksStack.add(tempList2);
-    }
-  } else {
-    print('fullMasks empty :(');
-  }*/
   return [boxes, classIds, scores, fullMasks];
 }
 
-denormBoxes(List boxes, shape) {
+List denormBoxes(List boxes, shape) {
   var h = shape[0];
   var w = shape[1];
   var scale = [h - 1, w - 1, h - 1, w - 1];
   var shift = [0, 0, 1, 1];
-  for (var i = 0; i < boxes.length; i++) {
-    for (var j = 0; j < boxes[i].length; j++) {
+  for (var i = 0; i < boxes.shape[0]; i++) {
+    for (var j = 0; j < boxes.shape[1]; j++) {
       boxes[i][j] = (boxes[i][j] * scale[j] + shift[j]).round();
     }
   }
   return boxes;
 }
 
-unmoldMask(List mask, bbox, imageShape) async {
+List unmoldMask(List mask, bbox, imageShape) {
   var threshold = 0.5;
   int y1 = bbox[0];
   int x1 = bbox[1];
   int y2 = bbox[2];
   int x2 = bbox[3];
-  // TODO: resize mask
   var boolMask = List.generate(
       mask.shape[0],
       (i) => List.generate(mask.shape[1],
@@ -580,7 +501,7 @@ unmoldMask(List mask, bbox, imageShape) async {
       format: ImagePackage.Format.rgb);
   maskImage =
       ImagePackage.copyResize(maskImage, width: x2 - x1, height: y2 - y1);
-  mask = bytesToArray(maskImage);
+  mask = imageTo3DList(maskImage);
   var binaryMask = [];
   Function eq = const ListEquality().equals;
   for (var i = 0; i < mask.shape[0]; i++) {
@@ -622,8 +543,6 @@ displayInstances(List image, List boxes, List masks, List classIds, classNames,
       format: ImagePackage.Format.rgb);
   for (var i = 0; i < N; i++) {
     Color color = colors[i];
-    print('color value ${color.value}');
-    print('color rgb ${color.red} ${color.green} ${color.blue}');
     //     if not np.any(boxes[i]):
     // # Skip this instance. Has no bbox. Likely lost in image cropping.
     // continue
@@ -690,11 +609,11 @@ predict(
 {
   print('predict()');
   final interpreter = await tfl.Interpreter.fromAsset('car_parts.tflite');
-  var moldOutput = await moldInputs(image);
-  List<List> moldedImages = moldOutput[0];
+  var moldOutput = moldInputs(image);
+  List moldedImages = moldOutput[0];
   List imageMetas = moldOutput[1];
   List windows = moldOutput[2];
-  var anchors = [await getAnchors(moldedImages[0].shape)];
+  var anchors = [await getAnchors(moldedImages.shape.sublist(1))];
   var inputs = [moldedImages, imageMetas, anchors];
   var outputTensors = interpreter.getOutputTensors();
   var outputShapes = [];
@@ -727,8 +646,8 @@ predict(
   print('End inference');
   List detectionsList = detections.getDoubleList().reshape(outputShapes[3]);
   List mrcnnMaskList = mrcnnMask.getDoubleList().reshape(outputShapes[4]);
-  var unmoldOutput = await unmoldDetections(detectionsList[0], mrcnnMaskList[0],
-      bytesToArray(image).shape, moldedImages[0].shape, windows[0]);
+  var unmoldOutput = unmoldDetections(detectionsList[0], mrcnnMaskList[0],
+      imageTo3DList(image).shape, moldedImages.shape.sublist(1), windows[0]);
   var finalRois = unmoldOutput[0];
   var finalClassIds = unmoldOutput[1];
   var finalScores = unmoldOutput[2];
@@ -737,7 +656,7 @@ predict(
       className: "Sides",
       methodName: "predict",
       text: "Found ${finalRois.length} instances");
-  var filename = await displayInstances(bytesToArray(image), finalRois,
+  var filename = await displayInstances(imageTo3DList(image), finalRois,
       finalMasks, finalClassIds, CarPartsConfig.classNames,
       scores: finalScores);
   print(filename);
@@ -761,7 +680,7 @@ Future<bool> internetAvailable() async {
 }
 
 Future<bool> uploadImage(
-    File image, CarSides predictedSide, CarSides realSide) async //In progress
+    File image, CarSides predictedSide, CarSides realSide) async
 {
   if (await internetAvailable()) {
     var now = DateTime.now();
@@ -814,7 +733,7 @@ Future<bool> uploadImage(
   return false;
 }
 
-save(File image, CarSides predictedSide,
+void save(File image, CarSides predictedSide,
     CarSides realSide) async //Saves picture in phone
 {
   var now = DateTime.now();
@@ -841,6 +760,39 @@ save(File image, CarSides predictedSide,
       className: "Sides",
       methodName: "Save",
       text: "localImage.path: ${localImage.path}");
+}
+
+Future<void> backup() async {
+  FLog.info(className: "Sides", methodName: "Backup", text: "Backing Up");
+  var dir = await getExternalStorageDirectory();
+  if (dir != null) {
+    FLog.info(
+        className: "Sides", methodName: "Backup", text: "Directory: $dir");
+    dir.list(recursive: false).forEach((f) async {
+      if (f.path.contains(".jpg")) {
+        FLog.info(className: "Sides", methodName: "Backup", text: "f: $f");
+        var pred = '${f.path.split("/")[f.path.split("/").length - 1][0]}'
+            .toUpperCase();
+        var real = '${f.path.split("/")[f.path.split("/").length - 1][1]}'
+            .toUpperCase();
+        FLog.info(
+            className: "Sides",
+            methodName: "Backup",
+            text: "pred: $pred, real: $real");
+        File fi = File(f.path);
+        var uploaded = false;
+        uploaded = await uploadImage(
+            fi, new CarSides.fromLetter(pred), new CarSides.fromLetter(real));
+        if (uploaded == true) {
+          FLog.info(
+              className: "Sides",
+              methodName: "Backup",
+              text: "Uploaded, deleted");
+          await fi.delete();
+        }
+      }
+    });
+  }
 }
 
 Future<String> getFileSize(File file, int decimals) async {

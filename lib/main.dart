@@ -130,17 +130,18 @@ class _MyHomePageState extends State<MyHomePage> {
       return;
     }
     getImageRunning = true;
-    ByteData imageData = await rootBundle.load('assets/car_800_552.jpg');
-    List<int> bytes = Uint8List.view(imageData.buffer);
-    ImagePackage.Image image = ImagePackage.decodeImage(bytes)!;
-    // XFile file = await _pictureScreen.cameraInterface.controller.takePicture();
-    // ImagePackage.Image image =
-    //     ImagePackage.decodeImage(File(file.path).readAsBytesSync())!;
-    // context.loaderOverlay.show();
+    // ByteData imageData = await rootBundle.load('assets/car_800_552.jpg');
+    // List<int> bytes = Uint8List.view(imageData.buffer);
+    // ImagePackage.Image image = ImagePackage.decodeImage(bytes)!;
+    XFile file = await _pictureScreen.cameraInterface.controller.takePicture();
+    ImagePackage.Image image =
+        ImagePackage.decodeImage(File(file.path).readAsBytesSync())!;
+    print('image res: ${image.width}x${image.height}');
+    context.loaderOverlay.show();
     // image = ImagePackage.copyResizeCropSquare(image, 512);
-    // image = ImagePackage.copyRotate(image, 90);
+    image = ImagePackage.copyRotate(image, 90);
     filename = await predict(image);
-    // context.loaderOverlay.hide();
+    context.loaderOverlay.hide();
     if (filename != null)
       setState(() {
         _onItemTapped(1);
