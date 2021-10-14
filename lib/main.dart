@@ -1,15 +1,16 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
-import 'package:sides/sides.dart';
 import 'package:f_logs/f_logs.dart';
-// import 'package:path_provider/path_provider.dart';
-// import 'package:flutter/services.dart' show rootBundle;
-import 'package:image/image.dart' as ImagePackage;
 import 'package:camera/camera.dart';
 import 'package:loader_overlay/loader_overlay.dart';
-//All functions are in sides.dart -> packages/sides/lib/sides.dart
+import 'predict.dart';
+import 'package:image/image.dart' as img;
+// import 'package:path_provider/path_provider.dart';
+// import 'package:flutter/services.dart' show rootBundle;
 
 List<CameraDescription> cameras = [];
 
@@ -117,9 +118,14 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
     getImageRunning = true;
     XFile file = await controller.takePicture();
-    ImagePackage.Image image =
-        ImagePackage.decodeImage(File(file.path).readAsBytesSync())!;
-    image = ImagePackage.copyRotate(image, 90);
+    img.Image image =
+        img.decodeImage(File(file.path).readAsBytesSync())!;
+
+    var imageData = await rootBundle.load('assets/input4.jpg');
+    List<int> bytes = Uint8List.view(imageData.buffer);
+    image = img.decodeImage(bytes)!;
+
+    // image = img.copyRotate(image, 90);
     context.loaderOverlay.show();
     filename = await predict(image);
     context.loaderOverlay.hide();
@@ -158,8 +164,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       return true;
     else {
       pageController.previousPage(
-        duration: Duration(milliseconds: 200),
-        curve: Curves.linear,
+        duration: Duration(milliseconds: 400),
+        curve: Curves.ease,
       );
       return false;
     }
@@ -175,7 +181,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     setState(() {
       _selectedIndex = index;
       pageController.animateToPage(index,
-          duration: Duration(milliseconds: 500), curve: Curves.ease);
+          duration: Duration(milliseconds: 400), curve: Curves.ease);
     });
   }
 
