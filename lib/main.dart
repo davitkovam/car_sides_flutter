@@ -5,7 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:f_logs/f_logs.dart';
-import 'package:camera/camera.dart';
+//import 'package:camera/camera.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:intl/intl.dart';
+import 'package:flutter_better_camera/camera.dart';
 import 'package:loader_overlay/loader_overlay.dart';
 import 'predict.dart';
 import 'package:image/image.dart' as img;
@@ -86,7 +89,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     final CameraController? cameraController = controller;
 
     // App state changed before we got the chance to initialize.
-    if (cameraController == null || !cameraController.value.isInitialized) {
+    if (cameraController == null || !cameraController.value.isInitialized!) {
       return;
     }
 
@@ -113,13 +116,27 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   Future getImage() async {
-    if (!controller.value.isInitialized || getImageRunning) {
+    if (!controller.value.isInitialized! || getImageRunning) {
       return;
     }
     getImageRunning = true;
-    XFile file = await controller.takePicture();
+   // File file = await controller.takePicture();
+    var cacheDir = await getTemporaryDirectory();
+
+    var now = DateTime.now();
+    var formatter = DateFormat('yyyyMMdd_HH_mm_ss');
+    String currentTimeStamp = formatter.format(now);
+
+
+    var path = cacheDir.path + "/" + currentTimeStamp;
+
+    try {
+      await controller.takePicture(path);
+    } on CameraException catch (e) {
+      return null;
+    }
     img.Image image =
-        img.decodeImage(File(file.path).readAsBytesSync())!;
+        img.decodeImage(File(path).readAsBytesSync())!;
 
     var imageData = await rootBundle.load('assets/input4.jpg');
     List<int> bytes = Uint8List.view(imageData.buffer);
@@ -230,7 +247,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Widget cameraPage() {
     return Container(
         color: Colors.black,
-        child: controller.value.isInitialized
+        child: controller.value.isInitialized!
             ? CameraPreview(controller)
             : Container());
   }

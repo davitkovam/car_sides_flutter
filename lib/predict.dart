@@ -525,6 +525,8 @@ predict(img.Image image) async //Predicts the image using the pretrained model
   Model customModel = await PyTorchMobile
       .loadModel('assets/saved_model.pt');
   var inputs = {"image": image, "height": imageArr.shape[0], "width": imageArr.shape[1]};
-  List? prediction = await customModel
-      .getPrediction([inputs], [3,800,800], DType.float32);
+  print("INPUUUUTS");
+  print(inputs);
+ // List? prediction = await customModel
+   //   .getPrediction([inputs], [3,800,800], DType.float32);
 }
